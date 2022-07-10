@@ -1,0 +1,9 @@
+comtypes==1.1.11
+pillow==9.1.1
+fpdf==1.7.2
+pypdf2==2.0.0
+python-dateutil==2.8.2
+tqdm==4.64.0
+pdf2image==1.16.0
+pypiwin32
+extract-msg==0.34.3
