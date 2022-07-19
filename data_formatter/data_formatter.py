@@ -199,20 +199,21 @@ class DataFormatter:
         skip_words = ['', '-', 'geb', 'dr', 'fallnr', 'fall-nr', 'fr', 'frau', 'hr', 'herr', 'der', 'auf', 'zim']
 
         patient_data = patient.split(' ')
-        # patient_data = [datum.replace(',', '') for datum in patient_data]
+        # remove geb. in front of the date
+        patient_data = [datum.replace('geb.', '') for datum in patient_data]
+
         # remove ',' and '-' from beginning and end of words
         patient_data = [datum.strip(' ,-') for datum in patient_data]
 
         # remove words in the skip_words list
         patient_data = [datum for datum in patient_data if not datum.lower() in skip_words]
 
-        skip_doctor = False
-
         # first find the birthday, and remove it from the list patient_data
         prov_patient_data = []
         for datum in patient_data:
             try:
                 if date_parse(datum):
+                    birthday = datum
                     continue
             except:
                 pass
@@ -222,14 +223,17 @@ class DataFormatter:
         # separate words if they are separated with a comma or a dot
         prov_patient_data = []
         for datum in patient_data:
+            prov = []
             splitted = datum.split(',')
-            splitted.extend(datum.split('.'))
             for word in splitted:
+                prov.extend(word.split('.'))
+            for word in prov:
                 if word != '':
                     prov_patient_data.append(word)
         patient_data = prov_patient_data
 
         # here we remove the doctor name and we isolate the fall_nr
+        skip_doctor = False
         prov_patient_data = []
         for datum in patient_data:
             if skip_doctor:
@@ -279,8 +283,14 @@ class DataFormatter:
             f.write('dok_dat_feld[3] = "MCC AA ' + documentation + ' Migration"\n')
             f.write('dok_dat_feld[5] = "' + documentation + '"\n')
             f.write('dok_dat_feld[7] = "' + case_nr + '"\n')
-            f.write('dok_dat_feld[11] = "' + first_name + '"\n')
-            f.write('dok_dat_feld[12] = "' + last_name + '"\n')
+            if first_name is not None:
+                f.write('dok_dat_feld[11] = "' + first_name + '"\n')
+            else:
+                print('WARNING: was not possible to extract the first name in patient: {}'.format(patient))
+            if last_name is not None:
+                f.write('dok_dat_feld[12] = "' + last_name + '"\n')
+            else:
+                print('WARNING: was not possible to extract the last name in patient: {}'.format(patient))
             f.write('dok_dat_feld[14] = "Migrationsdokument"\n')
             f.write('dok_dat_feld[15] = "2080"\n')
             f.write('dok_dat_feld[16] = "MCC HLT"\n')
@@ -291,7 +301,7 @@ class DataFormatter:
             if birthday is not None:
                 f.write('dok_dat_feld[53] = "' + birthday + '"\n')
             else:
-                print('WARNING: The Birthday was None! {}'.format(patient))
+                print('WARNING: was not possible to extract the birthday in patient: {}'.format(patient))
 
 
     # given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
