@@ -241,11 +241,18 @@ class DataFormatter:
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
 
-        first_name = patient_data[0]
-        if first_name[-1] == ',':
-            first_name = first_name.replace(',', '')
+        prov_patient_data = []
+        for datum in patient_data:
+            datum.strip(',')
+            splitted = datum.split(',')
+            prov_patient_data.extend(splitted)
+        patient_data = prov_patient_data
+        print(patient_data)
+
+        if patient_data:
+            first_name = patient_data[0]
             if len(patient_data) > 1:
-                last_name = patient_data[1].replace(',', '')
+                last_name = patient_data[1]
 
         return [first_name, last_name, birthday, case_nr]
 
@@ -382,5 +389,6 @@ class DataFormatter:
                 path_time = str(os.path.getmtime(in_path_file))
             file.write(out_path_file + '\n' + path_time + '\n')
         return txt_path
+
 
 
