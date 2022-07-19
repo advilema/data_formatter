@@ -249,6 +249,7 @@ class DataFormatter:
             if len(patient_data) > 1:
                 last_name = patient_data[1]
 
+        print([first_name, last_name, birthday, case_nr])
         return [first_name, last_name, birthday, case_nr]
 
     def _extract_patients_data(self, path):
