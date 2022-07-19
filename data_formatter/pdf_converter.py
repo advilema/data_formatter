@@ -13,7 +13,7 @@ from PyPDF2 import PdfMerger
 
 def file_to_pdf(in_path, out_path, verbose=False):
     data_format, _ = get_format(in_path)
-    data_format = data_format.lower()  # This fix any upper/lower case problem
+    data_format = data_format.lower()  # This fix any upper/lower case problem (e.g. .JPG vs .jpg)
     try:
         eval(data_format + '_to_pdf(in_path, out_path)')
         return None

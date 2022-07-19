@@ -125,6 +125,7 @@ class DataFormatter:
     def _add_header(pdf_path, header):
         MAX_DIM = 2000 #2000 pixels for the longest dimension of a PDF page when converted to JPG
 
+        print(pdf_path)
         images = convert_from_path(pdf_path)
         _, path = get_format(pdf_path)
         path += '_dummy_img'
