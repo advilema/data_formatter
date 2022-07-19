@@ -77,7 +77,7 @@ class DataFormatter:
                 error_msg = file_to_pdf(in_path_file, out_path_file, verbose=self.print_folders)
                 if error_msg is None:
                     file_relative_path_from_patient_folder = in_path_file[len(patient_folder)+2:]
-                    self._add_header(out_path_file, file_relative_path_from_patient_folder)
+                    #self._add_header(out_path_file, file_relative_path_from_patient_folder)
                     txt_path = self._update_info_txt(in_path_file, out_path_file, out_path_dir)
                     if txt_path_previous is None:
                         txt_path_previous = txt_path
@@ -125,7 +125,6 @@ class DataFormatter:
     def _add_header(pdf_path, header):
         MAX_DIM = 2000 #2000 pixels for the longest dimension of a PDF page when converted to JPG
 
-        print(pdf_path)
         images = convert_from_path(pdf_path)
         _, path = get_format(pdf_path)
         path += '_dummy_img'
