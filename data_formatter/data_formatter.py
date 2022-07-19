@@ -191,63 +191,58 @@ class DataFormatter:
 
     @staticmethod
     def _extract_patient_data(patient):
-        patient_data = patient.split(' ')
-        # patient_data = [datum.replace(',', '') for datum in patient_data]
-        patient_data = [datum.replace('geb.', '') for datum in patient_data]
-        skip_doctor = False
-
         first_name = None
         last_name = None
         birthday = None
         case_nr = None
 
-        #first find the birthday
+        skip_words = ['', '-', 'geb', 'dr', 'fallnr', 'fall-nr', 'fr', 'frau', 'hr', 'herr', 'der', 'auf', 'zim']
+
+        patient_data = patient.split(' ')
+        # patient_data = [datum.replace(',', '') for datum in patient_data]
+        # remove ',' and '-' from beginning and end of words
+        patient_data = [datum.strip(' ,-') for datum in patient_data]
+
+        # remove words in the skip_words list
+        patient_data = [datum for datum in patient_data if not datum.lower() in skip_words]
+
+        skip_doctor = False
+
+        # first find the birthday, and remove it from the list patient_data
         prov_patient_data = []
         for datum in patient_data:
             try:
                 if date_parse(datum):
-                    birthday = datum.replace(',', '')
                     continue
             except:
                 pass
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
 
-        #this is useful to separate fall-nr. from the actual number in case there is no space in between them
+        # separate words if they are separated with a comma or a dot
         prov_patient_data = []
         for datum in patient_data:
-            splitted = datum.split('.')
-            prov_patient_data.extend(splitted)
+            splitted = datum.split(',')
+            splitted.extend(datum.split('.'))
+            for word in splitted:
+                if word != '':
+                    prov_patient_data.append(word)
         patient_data = prov_patient_data
 
-        #here we remove the doctor name and other unuseful strings and we isolate the fall_nr
+        # here we remove the doctor name and we isolate the fall_nr
         prov_patient_data = []
         for datum in patient_data:
-            if datum == '':
-                continue
-            if datum == '-':
-                continue
             if skip_doctor:
                 skip_doctor = False
                 continue
-            if datum.lower() == 'dr.' or datum.lower() == 'dr' or datum.lower() == 'prof.' or datum.lower() == 'prof':
+            if datum.lower() == 'dr' or datum.lower() == 'prof':
                 skip_doctor = True
-                continue
-            if datum.lower() == 'fall-nr.' or datum.lower() == 'fall-nr' or datum.lower() == 'fallnr.' or datum.lower() == 'fallnr':
                 continue
             if datum.isnumeric() and len(datum) > 5:
                 case_nr = datum
                 continue
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
-
-        prov_patient_data = []
-        for datum in patient_data:
-            datum.strip(',')
-            splitted = datum.split(',')
-            prov_patient_data.extend(splitted)
-        patient_data = prov_patient_data
-        print(patient_data)
 
         if patient_data:
             first_name = patient_data[0]
@@ -292,7 +287,11 @@ class DataFormatter:
             today_str = today.strftime("%d.%m.%y")
             f.write('dok_dat_feld[50] = "' + today_str + '"\n')
             f.write('dok_dat_feld[52] = "' + today_str + '"\n')
-            f.write('dok_dat_feld[53] = "' + birthday + '"\n')
+            if birthday is not None:
+                f.write('dok_dat_feld[53] = "' + birthday + '"\n')
+            else:
+                print('WARNING: The Birthday was None! {}'.format(patient))
+
 
     # given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
     # and the filename, create the output_path_dir if it doesn't exis yet, and output the dir_path and file_path

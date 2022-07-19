@@ -10,6 +10,7 @@ from PyPDF2 import PdfMerger
 #from multiprocessing import Process, Manager
 #import time
 
+#XLSX vs XLS, DOC vs DOCX
 
 def file_to_pdf(in_path, out_path, verbose=False):
     data_format, _ = get_format(in_path)
