@@ -15,7 +15,7 @@ invalid_folders = ['Arch', 'Stomadoku', 'Wunddoku']
 
 
 class DataFormatter:
-    def __init__(self, input_folder, output_folder, time_order='creation',  print_folders=False):
+    def __init__(self, input_folder, output_folder, time_order='creation',  print_folders=False, log_path=None):
         self.input_folder = input_folder
         self.output_folder = output_folder
         cwd = os.getcwd()
@@ -29,7 +29,14 @@ class DataFormatter:
             self.abs_out_path = output_folder
         self.print_folders = print_folders
         self.time_order = time_order
-        self.tot_files = self.count_files()
+        if log_path is None:
+            self.log_path = os.path.join(self.abs_out_path, 'log.txt')
+        else:
+            if os.path.isabs(log_path):
+                self.log_path = log_path
+            else:
+                self.log_path = os.path.join(cwd, log_path)
+        self.tot_files = self._count_files()
 
     def clean_folder(self):
         patient_folder = None
@@ -102,7 +109,7 @@ class DataFormatter:
     def extract_csv(self):
         csv_path = os.path.join(self.abs_out_path, 'csv_file.csv')
         header = ['Vorname', 'Nachname', 'Geburtstag', 'Fall-nr']
-        patients_data = self._extract_patients_data(self.abs_in_path)
+        patients_data = self._extract_patients_data()
 
         with open(csv_path, 'w', encoding='UTF8') as f:
             writer = csv.writer(f)
@@ -113,7 +120,25 @@ class DataFormatter:
                     continue
                 writer.writerow(patient_data)
 
-    def count_files(self):
+    def extract_patient_folders(self):
+        patient_folder = None
+        previous_patient_folder = None
+
+        _, log_dir = break_path(self.log_path)
+        make_dir(Path(log_dir))
+        # clear the log file if there exist already one
+        with open(self.log_path, 'w') as f:
+            f.write('')
+
+        for root, subdirs, files in os.walk(self.abs_in_path):
+            patient_folder = self._get_patient_folder(root, patient_folder)
+            if patient_folder is not None and previous_patient_folder != patient_folder:
+                patient, _ = break_path(patient_folder)
+                with open(self.log_path, 'a') as f:
+                    f.write(patient + '\n')
+                previous_patient_folder = patient_folder
+
+    def _count_files(self):
         count = 0
         for _, _, files in os.walk(self.abs_in_path):
             for file in files:
@@ -256,12 +281,12 @@ class DataFormatter:
         print([first_name, last_name, birthday, case_nr])
         return [first_name, last_name, birthday, case_nr]
 
-    def _extract_patients_data(self, path):
+    def _extract_patients_data(self):
         patient_folder = None
         previous_patient_folder = None
         patients_data = []
 
-        for root, subdirs, files in os.walk(path):
+        for root, subdirs, files in os.walk(self.abs_in_path):
             patient_folder = self._get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
                 patient, _ = break_path(patient_folder)
@@ -302,7 +327,6 @@ class DataFormatter:
                 f.write('dok_dat_feld[53] = "' + birthday + '"\n')
             else:
                 print('WARNING: was not possible to extract the birthday in patient: {}'.format(patient))
-
 
     # given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
     # and the filename, create the output_path_dir if it doesn't exis yet, and output the dir_path and file_path

@@ -8,10 +8,14 @@ def main() -> None:
     args = parse()
     input_folder = args.input
     output_folder = args.output
-    formatter = DataFormatter(input_folder, output_folder, print_folders=args.print_folders)
+    formatter = DataFormatter(input_folder, output_folder, print_folders=args.print_folders,log_path=args.log)
 
     if args.extract_csv:
         formatter.extract_csv()
+        if args.extract_patients:
+            formatter.extract_patient_folders()
+    if args.extract_patients:
+        formatter.extract_patient_folders()
     else:
         formatter.clean_folder()
         formatter.extract_csv()
