@@ -101,7 +101,7 @@ class DataFormatter:
                 in_path_file = os.path.join(root, filename)
                 error_msg = file_to_pdf(in_path_file, out_path_file, verbose=self.print_folders)
                 if error_msg is None:
-                    #file_relative_path_from_patient_folder = in_path_file[len(patient_folder)+2:]
+                    file_relative_path_from_patient_folder = in_path_file[len(patient_folder)+2:]
                     #self._add_header(out_path_file, file_relative_path_from_patient_folder)
                     txt_path = self._update_info_txt(in_path_file, out_path_file, out_path_dir)
                     if txt_path_previous is None:
@@ -265,6 +265,8 @@ class DataFormatter:
         # remove words in the skip_words list
         patient_data = [datum for datum in patient_data if not datum.lower() in skip_words]
 
+        #print(patient_data)
+
         # first find the birthday, and remove it from the list patient_data
         prov_patient_data = []
         for datum in patient_data:
@@ -277,6 +279,8 @@ class DataFormatter:
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
 
+        #print(patient_data)
+
         # separate words if they are separated with a comma or a dot
         prov_patient_data = []
         for datum in patient_data:
@@ -288,6 +292,8 @@ class DataFormatter:
                 if word != '':
                     prov_patient_data.append(word)
         patient_data = prov_patient_data
+
+        #print(patient_data)
 
         # here we remove the doctor name and we isolate the fall_nr
         skip_doctor = False
@@ -305,10 +311,14 @@ class DataFormatter:
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
 
+        #print(patient_data)
+
         if patient_data:
             first_name = patient_data[0]
             if len(patient_data) > 1:
                 last_name = patient_data[1]
+
+        #print(patient_data)
 
         return [first_name, last_name, birthday, case_nr]
 
