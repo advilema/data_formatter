@@ -15,7 +15,7 @@ invalid_folders = ['Arch', 'Stomadoku', 'Wunddoku']
 
 
 class DataFormatter:
-    def __init__(self, input_folder, output_folder, time_order='creation',  print_folders=False, log_path=None):
+    def __init__(self, input_folder, output_folder, time_order='creation',  print_folders=False, log_path=None, err_path=None):
         self.input_folder = input_folder
         self.output_folder = output_folder
         cwd = os.getcwd()
@@ -36,12 +36,25 @@ class DataFormatter:
                 self.log_path = log_path
             else:
                 self.log_path = os.path.join(cwd, log_path)
+        if err_path is None:
+            self.err_path = os.path.join(self.abs_out_path, 'err.txt')
+        else:
+            if os.path.isabs(err_path):
+                self.err_path = err_path
+            else:
+                self.err_path = os.path.join(cwd, err_path)
         self.tot_files = self._count_files()
 
     def clean_folder(self):
+        # create the folder where the log will be saved, then create a new blank log file
         _, log_dir = break_path(self.log_path)
         make_dir(Path(log_dir))
         with open(self.log_path, 'w') as f:
+            f.write('')
+        # same as the log but with the err file
+        _, err_dir = break_path(self.err_path)
+        make_dir(Path(err_dir))
+        with open(self.err_path, 'w') as f:
             f.write('')
 
         patient_folder = None
@@ -88,7 +101,7 @@ class DataFormatter:
                 in_path_file = os.path.join(root, filename)
                 error_msg = file_to_pdf(in_path_file, out_path_file, verbose=self.print_folders)
                 if error_msg is None:
-                    file_relative_path_from_patient_folder = in_path_file[len(patient_folder)+2:]
+                    #file_relative_path_from_patient_folder = in_path_file[len(patient_folder)+2:]
                     #self._add_header(out_path_file, file_relative_path_from_patient_folder)
                     txt_path = self._update_info_txt(in_path_file, out_path_file, out_path_dir)
                     if txt_path_previous is None:
@@ -103,16 +116,18 @@ class DataFormatter:
                 try:
                     self._merge_pdfs(txt_path_previous)
                 except Exception as e:
-                    with open(self.log_path, 'a') as f:
-                        f.write(e)
+                    with open(self.err_path, 'a') as f:
+                        f.write(str(e))
+                        f.write('\n\n\n')
                 self._make_metadata(txt_path_previous)
                 txt_path_previous = txt_path
 
         try:
             self._merge_pdfs(txt_path)
         except Exception as e:
-            with open(self.log_path, 'a') as f:
-                f.write(e)
+            with open(self.err_path, 'a') as f:
+                f.write(str(e))
+                f.write('\n\n\n')
         self._make_metadata(txt_path)
         if not self.print_folders:
             charge_bar.close()
@@ -396,7 +411,6 @@ class DataFormatter:
             os.remove(pdf)
 
     def _save_log(self, not_converted_files, ignored_files, verbose=True):
-        log_path = os.path.join(self.abs_out_path, 'log.txt')
 
         #save in the log ignored and not converted files
         with open(self.log_path, 'a') as f:
