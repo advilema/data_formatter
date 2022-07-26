@@ -11,7 +11,7 @@ from PyPDF2 import PdfMerger
 from data_formatter.util import break_path, get_format, make_dir
 from data_formatter.pdf_converter import file_to_pdf, jpg_to_pdf
 
-invalid_folders = ['Arch', 'Stomadoku', 'Wunddoku']
+invalid_folders = ['Arch', 'Stoma', 'Wund']
 
 
 class DataFormatter:
