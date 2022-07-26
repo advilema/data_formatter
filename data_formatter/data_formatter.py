@@ -39,6 +39,11 @@ class DataFormatter:
         self.tot_files = self._count_files()
 
     def clean_folder(self):
+        _, log_dir = break_path(self.log_path)
+        make_dir(Path(log_dir))
+        with open(self.log_path, 'w') as f:
+            f.write('')
+
         patient_folder = None
         not_converted_files = []
         ignored_files = []
@@ -95,11 +100,19 @@ class DataFormatter:
                     charge_bar.update(n=1)
 
             if txt_path_previous != txt_path:
-                self._merge_pdfs(txt_path_previous)
+                try:
+                    self._merge_pdfs(txt_path_previous)
+                except Exception as e:
+                    with open(self.log_path, 'a') as f:
+                        f.write(e)
                 self._make_metadata(txt_path_previous)
                 txt_path_previous = txt_path
 
-        self._merge_pdfs(txt_path)
+        try:
+            self._merge_pdfs(txt_path)
+        except Exception as e:
+            with open(self.log_path, 'a') as f:
+                f.write(e)
         self._make_metadata(txt_path)
         if not self.print_folders:
             charge_bar.close()
@@ -121,6 +134,9 @@ class DataFormatter:
                 writer.writerow(patient_data)
 
     def extract_patient_folders(self):
+        """
+        Extract all the patient folders and save them in the log file
+        """
         patient_folder = None
         previous_patient_folder = None
 
@@ -278,7 +294,6 @@ class DataFormatter:
             if len(patient_data) > 1:
                 last_name = patient_data[1]
 
-        print([first_name, last_name, birthday, case_nr])
         return [first_name, last_name, birthday, case_nr]
 
     def _extract_patients_data(self):
@@ -358,7 +373,7 @@ class DataFormatter:
         files = []
         for i in range(len(lines) // 2):
             path = re.sub('\n', '', lines[2 * i])
-            time = float(re.sub("\n", '', lines[2 * i + 1]))
+            time = float(re.sub('\n', '', lines[2 * i + 1]))
             files.append([path, time])
         key = lambda x: x[1]
         files = sorted(files, key=lambda x: x[1])
