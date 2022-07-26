@@ -178,49 +178,6 @@ class DataFormatter:
                     count += 1
         return count
 
-    @staticmethod
-    def _add_header(pdf_path, header):
-        MAX_DIM = 2000 #2000 pixels for the longest dimension of a PDF page when converted to JPG
-
-        images = convert_from_path(pdf_path)
-        _, path = get_format(pdf_path)
-        path += '_dummy_img'
-        img_pdf_paths = []
-        for i in range(len(images)):
-            # save pdfs pages as images
-            img_path = path + str(i) + '.jpg'
-            img_pdf_path = path + str(i) + '.pdf'
-            # edit the image by adding the header
-            images[i].save(img_path, 'JPEG')
-            img = Image.open(img_path)
-            height, width = img.size
-            new_height = height
-            new_width = width
-            if height > width and height > MAX_DIM:
-                new_height = MAX_DIM
-                new_width = int((MAX_DIM/height)*width)
-            if width > height and width > MAX_DIM:
-                new_width = MAX_DIM
-                new_height = int((MAX_DIM/width) * height)
-            img = img.resize((new_height, new_width))
-            title_font = ImageFont.truetype("arial.ttf", 30, encoding="unic")
-            img_editable = ImageDraw.Draw(img)
-            img_editable.text((10, 10), header, (256, 0, 0), font=title_font)
-            #save the edited image
-            img.save(img_path)
-            #convert it to pdf
-            jpg_to_pdf(img_path, img_pdf_path)
-            os.remove(img_path)
-            img_pdf_paths.append(img_pdf_path)
-
-        merger = PdfMerger()
-        for pdf in img_pdf_paths:
-            merger.append(pdf)
-        merger.write(pdf_path)
-        merger.close()
-        for pdf in img_pdf_paths:
-            os.remove(pdf)
-
     #Thumbs.db files are cache files generated to load faster image previews
     @staticmethod
     def _check_cache_file(file_path):
