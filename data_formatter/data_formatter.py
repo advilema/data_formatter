@@ -399,7 +399,7 @@ class DataFormatter:
         log_path = os.path.join(self.abs_out_path, 'log.txt')
 
         #save in the log ignored and not converted files
-        with open(log_path, 'w') as f:
+        with open(self.log_path, 'a') as f:
             if ignored_files:
                 f.write('The following {} files out of the total {} files have been ignored since the patient folder was missing '
                         'the id number:\n\n'.format(len(ignored_files), self.tot_files))
@@ -422,7 +422,7 @@ class DataFormatter:
 
         #print the log
         if verbose:
-            with open(log_path, 'r') as f:
+            with open(self.log_path, 'r') as f:
                 lines = f.readlines()
                 print('\n\n\n')
                 for line in lines:
