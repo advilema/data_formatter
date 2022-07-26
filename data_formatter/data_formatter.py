@@ -210,19 +210,18 @@ class DataFormatter:
         birthday = None
         case_nr = None
 
-        skip_words = ['', '-', 'geb', 'dr', 'fallnr', 'fall-nr', 'fr', 'frau', 'hr', 'herr', 'der', 'auf', 'zim']
+        skip_words = ['', '-', 'geb', 'fallnr', 'fall-nr', 'fr', 'frau', 'hr', 'herr', 'der', 'auf',
+                      'zim', 'nf', 'unbekannt', 'tumorwunde', 'hausarzt']
 
         patient_data = patient.split(' ')
         # remove geb. in front of the date
         patient_data = [datum.replace('geb.', '') for datum in patient_data]
 
         # remove ',' and '-' from beginning and end of words
-        patient_data = [datum.strip(' ,-') for datum in patient_data]
+        patient_data = [datum.strip(' ,-.') for datum in patient_data]
 
         # remove words in the skip_words list
         patient_data = [datum for datum in patient_data if not datum.lower() in skip_words]
-
-        #print(patient_data)
 
         # first find the birthday, and remove it from the list patient_data
         prov_patient_data = []
@@ -230,13 +229,12 @@ class DataFormatter:
             try:
                 if date_parse(datum):
                     birthday = datum
+                    prov_patient_data.append('birthday')
                     continue
             except:
                 pass
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
-
-        #print(patient_data)
 
         # separate words if they are separated with a comma or a dot
         prov_patient_data = []
@@ -250,17 +248,19 @@ class DataFormatter:
                     prov_patient_data.append(word)
         patient_data = prov_patient_data
 
-        #print(patient_data)
-
         # here we remove the doctor name and we isolate the fall_nr
         skip_doctor = False
         prov_patient_data = []
         for datum in patient_data:
             if skip_doctor:
-                skip_doctor = False
+                if len(datum) > 1:
+                    skip_doctor = False
                 continue
-            if datum.lower() == 'dr' or datum.lower() == 'prof':
+            if datum.lower() == 'dr' or datum.lower() == 'prof' or datum.lower() == 'd':
                 skip_doctor = True
+                continue
+            # remove nf-zentrum, nf-arzt
+            if 'nf-' in datum.lower():
                 continue
             if datum.isnumeric() and len(datum) > 5:
                 case_nr = datum
@@ -268,14 +268,24 @@ class DataFormatter:
             prov_patient_data.append(datum)
         patient_data = prov_patient_data
 
-        #print(patient_data)
+        # delete all remaining numeric data
+        prov_patient_data = []
+        for datum in patient_data:
+            if datum.isnumeric():
+                continue
+            prov_patient_data.append(datum)
+        patient_data = prov_patient_data
 
         if patient_data:
             first_name = patient_data[0]
             if len(patient_data) > 1:
-                last_name = patient_data[1]
-
-        #print(patient_data)
+                if patient_data[1] != 'birthday':
+                    last_name = patient_data[1]
+                    if len(patient_data) > 2:
+                        for i in range(2, len(patient_data)):
+                            if patient_data[i] == 'birthday':
+                                break
+                            last_name += ' ' + patient_data[i]
 
         return [first_name, last_name, birthday, case_nr]
 
