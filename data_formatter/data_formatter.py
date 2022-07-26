@@ -11,7 +11,7 @@ from PyPDF2 import PdfMerger
 from data_formatter.util import break_path, get_format, make_dir
 from data_formatter.pdf_converter import file_to_pdf, jpg_to_pdf
 
-invalid_folders = ['Arch', 'Stoma', 'Wund']
+invalid_folders = ['Arch', 'Stoma', 'Wund', 'Patientenunterlagen']
 
 
 class DataFormatter:
@@ -152,19 +152,20 @@ class DataFormatter:
         """
         Extract all the patient folders and save them in the log file
         """
-        patient_folder = None
-        previous_patient_folder = None
-
         _, log_dir = break_path(self.log_path)
         make_dir(Path(log_dir))
         # clear the log file if there exist already one
         with open(self.log_path, 'w') as f:
             f.write('')
 
+        patient_folder = None
+        previous_patient_folder = None
+
         for root, subdirs, files in os.walk(self.abs_in_path):
             patient_folder = self._get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
                 patient, _ = break_path(patient_folder)
+                print(patient)
                 with open(self.log_path, 'a') as f:
                     f.write(patient + '\n')
                 previous_patient_folder = patient_folder
