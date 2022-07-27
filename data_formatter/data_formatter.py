@@ -65,6 +65,8 @@ class DataFormatter:
         txt_path_previous = None
         patient = ''
 
+        skip_debug = True # TODO: delete this once the debugging it's over
+
         if self.print_folders:
             print('A total of {} files will be processed.\n'.format(self.tot_files))
 
@@ -78,8 +80,10 @@ class DataFormatter:
             if patient_folder is None:
                 continue
             patient, _ = break_path(patient_folder)
-            _, _, _, case_nr = self._extract_patient_data(patient)
-            if case_nr is None:
+            patient_name, patient_surname, _, case_nr = self._extract_patient_data(patient)
+            if patient_name == 'Sonja' and patient_surname == 'Häfelfinger':
+                skip_debug = False
+            if case_nr is None or skip_debug:
                 true_files = [file for file in files if not self._check_cache_file(file)]
                 n_files += len(true_files)
                 [ignored_files.append([os.path.join(root, filename), patient]) for filename in files]
@@ -308,6 +312,9 @@ class DataFormatter:
         _, txt_path_root = break_path(txt_path)
         patient, _ = break_path(txt_path_root)
         metadata_path = os.path.join(txt_path_root, patient + '.jpl')
+        _, metadata_dir = break_path(metadata_path)
+        make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
+
         first_name, last_name, birthday, case_nr = self._extract_patient_data(patient)
         with open(metadata_path, 'w') as f:
             f.write('dokuart = "DMDOK"\n')

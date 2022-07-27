@@ -30,7 +30,8 @@ def file_to_pdf(in_path, out_path, verbose=False):
     except Exception as e:
         error_msg = "Was not possible to convert the file. This may happen if the file is damaged or temporary."
         if verbose:
-            print("\t" + error_msg)
+            #print("\t" + error_msg )
+            print("\t" + str(e))
         return error_msg
 
 
