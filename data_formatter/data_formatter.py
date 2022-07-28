@@ -65,7 +65,7 @@ class DataFormatter:
         txt_path_previous = None
         patient = ''
 
-        skip_debug = True # TODO: delete this once the debugging it's over
+        skip_debug = False # TODO: delete this once the debugging it's over
 
         if self.print_folders:
             print('A total of {} files will be processed.\n'.format(self.tot_files))
