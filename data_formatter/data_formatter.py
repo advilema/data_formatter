@@ -81,7 +81,9 @@ class DataFormatter:
                 continue
             patient, _ = break_path(patient_folder)
             patient_name, patient_surname, _, case_nr = self._extract_patient_data(patient)
-            if patient_name == 'Sonja' and patient_surname == 'Häfelfinger':
+            #if patient_name == 'Sonja' and patient_surname == 'Häfelfinger':
+            #    skip_debug = False
+            if case_nr == '0042640376':
                 skip_debug = False
             if case_nr is None or skip_debug:
                 true_files = [file for file in files if not self._check_cache_file(file)]
@@ -119,20 +121,22 @@ class DataFormatter:
             if txt_path_previous != txt_path:
                 try:
                     self._merge_pdfs(txt_path_previous)
+                    self._make_metadata(txt_path_previous)
                 except Exception as e:
                     with open(self.err_path, 'a') as f:
+                        print(e)
                         f.write(str(e))
                         f.write('\n\n\n')
-                self._make_metadata(txt_path_previous)
                 txt_path_previous = txt_path
 
         try:
             self._merge_pdfs(txt_path)
+            self._make_metadata(txt_path)
         except Exception as e:
             with open(self.err_path, 'a') as f:
+                print(e)
                 f.write(str(e))
                 f.write('\n\n\n')
-        self._make_metadata(txt_path)
         if not self.print_folders:
             charge_bar.close()
 
