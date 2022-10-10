@@ -17,7 +17,7 @@ def main() -> None:
     if args.extract_patients:
         formatter.extract_patient_folders()
     else:
-        formatter.clean_folder()
+        formatter.format()
         formatter.extract_csv()
 
 

@@ -8,137 +8,338 @@ from tqdm import tqdm
 from pdf2image import convert_from_path
 from PIL import Image, ImageFont, ImageDraw
 from PyPDF2 import PdfMerger
-from data_formatter.util import break_path, get_format, make_dir
+from data_formatter.util import break_path, get_format, make_dir, search_str, append_str, check_cache_file, make_file
 from data_formatter.pdf_converter import file_to_pdf, jpg_to_pdf
 
 invalid_folders = ['Arch', 'Stoma', 'Wund', 'Patientenunterlagen']
 
 
+def extract_patient_data(patient: str) -> list[str, str, str, str]:
+    """
+    Extract first_name, last_name, birthday, case_nr from the patient folder name.
+
+
+    :param patient: patient folder name
+    :return: first_name, last_name, birthday, case_nr
+    """
+    # TODO: Invertire first_name con last_name
+    first_name = None
+    last_name = None
+    birthday = None
+    case_nr = None
+
+    skip_words = ['', '-', 'geb', 'fallnr', 'fall-nr', 'fr', 'frau', 'hr', 'herr', 'der', 'auf',
+                  'zim', 'nf', 'unbekannt', 'tumorwunde', 'hausarzt']
+
+    patient_data = patient.split(' ')
+    # remove geb. in front of the date
+    patient_data = [datum.replace('geb.', '') for datum in patient_data]
+
+    # remove ',' and '-' from beginning and end of words
+    patient_data = [datum.strip(' ,-.') for datum in patient_data]
+
+    # remove words in the skip_words list
+    patient_data = [datum for datum in patient_data if not datum.lower() in skip_words]
+
+    # first find the birthday, and remove it from the list patient_data.
+    prov_patient_data = []
+    for datum in patient_data:
+        try:
+            if date_parse(datum):
+                birthday = datum
+                prov_patient_data.append('birthday')  # put a mark to remember the position where the birthday was
+                continue
+        except:
+            pass
+        prov_patient_data.append(datum)
+    patient_data = prov_patient_data
+
+    # split words if that are separated with a comma or a dot
+    prov_patient_data = []
+    for datum in patient_data:
+        prov = []
+        splitted = datum.split(',')
+        for word in splitted:
+            prov.extend(word.split('.'))
+        for word in prov:
+            if word != '':
+                prov_patient_data.append(word)
+    patient_data = prov_patient_data
+
+    # here we remove the doctor name and we isolate the fall_nr
+    skip_doctor = False
+    prov_patient_data = []
+    for datum in patient_data:
+        if skip_doctor:
+            if len(datum) > 1:
+                skip_doctor = False
+            continue
+        if datum.lower() == 'dr' or datum.lower() == 'prof' or datum.lower() == 'd':
+            skip_doctor = True
+            continue
+        # remove nf-zentrum, nf-arzt
+        if 'nf-' in datum.lower():
+            continue
+        if datum.isnumeric() and len(datum) > 5:
+            case_nr = datum
+            continue
+        prov_patient_data.append(datum)
+    patient_data = prov_patient_data
+
+    # delete all remaining numeric data
+    prov_patient_data = []
+    for datum in patient_data:
+        if datum.isnumeric():
+            continue
+        prov_patient_data.append(datum)
+    patient_data = prov_patient_data
+
+    if patient_data:
+        first_name = patient_data[0]
+        if len(patient_data) > 1:
+            if patient_data[1] != 'birthday':
+                last_name = patient_data[1]
+                if len(patient_data) > 2:
+                    for i in range(2, len(patient_data)):
+                        if patient_data[i] == 'birthday':
+                            break
+                        last_name += ' ' + patient_data[i]
+
+    return [first_name, last_name, birthday, case_nr]
+
+
+def get_patient_folder(root, patient_folder):
+    """
+
+    :param self:
+    :param root:
+    :param patient_folder:
+    :return:
+    """
+    # in this case our current folder is inside the patient_folder, so we simply return the patient_folder
+    if patient_folder is not None and patient_folder in root:
+        return patient_folder
+
+    current_folder, _ = break_path(root)
+    [_, _, _, case_nr] = extract_patient_data(current_folder)
+
+    # if the current_folder has a case_nr is a patient_folder. So return the path
+    if case_nr is not None:
+        return root
+
+    # if the current folder does not have a case_nr, can't be a patient folder
+    return None
+
+
+def merge_pdfs(txt_path):
+    # TODO: consider putting this into the pdf_converter file, or somewhere else
+    _, txt_path_root = break_path(txt_path)
+    patient, _ = break_path(txt_path_root)
+    with open(txt_path) as f:
+        lines = f.readlines()
+    files = []
+    for i in range(len(lines) // 2):
+        path = re.sub('\n', '', lines[2 * i])
+        time = float(re.sub('\n', '', lines[2 * i + 1]))
+        files.append([path, time])
+    key = lambda x: x[1]
+    files = sorted(files, key=lambda x: x[1])
+    paths = [file[0] for file in files]
+
+    merger = PdfMerger()
+
+    for pdf in paths:
+        merger.append(pdf)
+
+    _, root = break_path(txt_path)
+    [first_name, last_name, birthday, case_nr] = extract_patient_data(patient)
+    filename = first_name + ', ' + last_name + ' Fall-Nr ' + case_nr + '.pdf'
+    merge_path = os.path.join(root, filename)
+    merger.write(merge_path)
+    merger.close()
+
+    # remove pdfs and txt file
+    os.remove(txt_path)
+    for pdf in paths:
+        os.remove(pdf)
+
+
+def make_metadata(txt_path):
+    _, txt_path_root = break_path(txt_path)
+    patient, _ = break_path(txt_path_root)
+    [first_name, last_name, birthday, case_nr] = extract_patient_data(patient)
+    filename = first_name + ', ' + last_name + ' Fall-Nr ' + case_nr + '.jpl'
+    metadata_path = os.path.join(txt_path_root, filename)
+    _, metadata_dir = break_path(metadata_path)
+    make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
+
+    first_name, last_name, birthday, case_nr = extract_patient_data(patient)
+    with open(metadata_path, 'w') as f:
+        f.write('dokuart = "DMDOK"\n')
+        f.write('logi_verzeichnis = "Freigabe"\n')
+        documentation = 'Wunddokumentation' if 'Wunddoku' in txt_path_root else 'Stomadokumentation'
+        f.write('dok_dat_feld[3] = "MCC AA ' + documentation + ' Migration"\n')
+        f.write('dok_dat_feld[5] = "' + documentation + '"\n')
+        f.write('dok_dat_feld[7] = "' + case_nr + '"\n')
+        if first_name is not None:
+            f.write('dok_dat_feld[11] = "' + first_name + '"\n')
+        else:
+            print('WARNING: was not possible to extract the first name in patient: {}'.format(patient))
+        if last_name is not None:
+            f.write('dok_dat_feld[12] = "' + last_name + '"\n')
+        else:
+            print('WARNING: was not possible to extract the last name in patient: {}'.format(patient))
+        f.write('dok_dat_feld[14] = "Migrationsdokument"\n')
+        f.write('dok_dat_feld[15] = "2080"\n')
+        f.write('dok_dat_feld[16] = "MCC HLT"\n')
+        today = date.today()
+        today_str = today.strftime("%d.%m.%y")
+        f.write('dok_dat_feld[50] = "' + today_str + '"\n')
+        f.write('dok_dat_feld[52] = "' + today_str + '"\n')
+        if birthday is not None:
+            f.write('dok_dat_feld[53] = "' + birthday + '"\n')
+        else:
+            print('WARNING: was not possible to extract the birthday in patient: {}'.format(patient))
+
+
 class DataFormatter:
-    def __init__(self, input_folder, output_folder, time_order='creation',  print_folders=False, log_path=None, err_path=None):
-        self.input_folder = input_folder
-        self.output_folder = output_folder
+    def __init__(self, input_folder, output_folder, time_order='creation', print_folders=False,
+                 log_path=None, err_path=None, record_path=None):
+        """
+
+        :param input_folder: input folder, either as a relatve path or as an absolute path
+        :param output_folder: output folder, either as a relatve path or as an absolute path
+        :param time_order: either 'creation' or 'modification' time. the file ordering will be done according to this parameter
+        :param verbose:
+        :param log_path:
+        :param err_path:
+        :param record_path:
+        """
         cwd = os.getcwd()
+
+        # absolute path to input folder
         if not os.path.isabs(input_folder):
             self.abs_in_path = os.path.join(cwd, input_folder)
         else:
             self.abs_in_path = input_folder
+        # absolute path to output folder
         if not os.path.isabs(output_folder):
             self.abs_out_path = os.path.join(cwd, output_folder)
         else:
             self.abs_out_path = output_folder
+
         self.print_folders = print_folders
         self.time_order = time_order
+
         if log_path is None:
             self.log_path = os.path.join(self.abs_out_path, 'log.txt')
         else:
+            # make sure log_path is an absolute path
             if os.path.isabs(log_path):
                 self.log_path = log_path
             else:
                 self.log_path = os.path.join(cwd, log_path)
+
         if err_path is None:
             self.err_path = os.path.join(self.abs_out_path, 'err.txt')
         else:
+            # make sure err_path is an absolute path
             if os.path.isabs(err_path):
                 self.err_path = err_path
             else:
                 self.err_path = os.path.join(cwd, err_path)
+
+        if record_path is None:
+            self.record_path = os.path.join(self.abs_out_path, 'files_record.txt')
+        else:
+            # make sure record_path is an absolute path
+            if os.path.isabs(record_path):
+                self.record_path = record_path
+            else:
+                self.record_path = os.path.join(cwd, record_path)
         self.tot_files = self._count_files()
 
-    def clean_folder(self):
-        # create the folder where the log will be saved, then create a new blank log file
-        _, log_dir = break_path(self.log_path)
-        make_dir(Path(log_dir))
-        with open(self.log_path, 'w') as f:
-            f.write('')
-        # same as the log but with the err file
-        _, err_dir = break_path(self.err_path)
-        make_dir(Path(err_dir))
-        with open(self.err_path, 'w') as f:
-            f.write('')
+    def format(self):
+        """
+        format the files into the patient folders in the self.abs_in_path folder, and save the formatted file in the
+        abs_out_path folder
+        """
+        # initialize the log file and the err file
+        make_file(self.log_path)
+        make_file(self.err_path)
 
+        self.n_files = 0
         patient_folder = None
         not_converted_files = []
         ignored_files = []
-        n_files = 0
         txt_path = None
         txt_path_previous = None
-        patient = ''
-
-        skip_debug = False # TODO: delete this once the debugging it's over
 
         if self.print_folders:
             print('A total of {} files will be processed.\n'.format(self.tot_files))
+        else:
+            # initialize the charging bar if we are not going to print the folders
+            self.charge_bar = tqdm(total=self.tot_files)
 
-        if not self.print_folders:
-            charge_bar = tqdm(total=self.tot_files)
-        for root, subdirs, files in os.walk(self.abs_in_path):
-            if files and self.print_folders:
-                print('--\ncurrent folder: ' + root)
-            patient_folder = self._get_patient_folder(root, patient_folder)
+        for root, _, files in os.walk(self.abs_in_path):
+            patient_folder = get_patient_folder(root, patient_folder)
 
             if patient_folder is None:
-                continue
-            patient, _ = break_path(patient_folder)
-            patient_name, patient_surname, _, case_nr = self._extract_patient_data(patient)
-            #if patient_name == 'Sonja' and patient_surname == 'Häfelfinger':
-            #    skip_debug = False
-            if case_nr == '0042640376':
-                skip_debug = False
-            if case_nr is None or skip_debug:
-                true_files = [file for file in files if not self._check_cache_file(file)]
-                n_files += len(true_files)
-                [ignored_files.append([os.path.join(root, filename), patient]) for filename in files]
-                if not self.print_folders:
-                    charge_bar.update(n=len(files))
-                else:
-                    print("The following {} files have been skipped since the patient doesn't have an ID number".format(len(files)))
-                    [print("\t{}".format(file)) for file in true_files]
+                # the current folder is not under a patient_folder, so we skip it
                 continue
 
-            for filename in files:
-                if self._check_cache_file(filename):
+            if self.print_folders:
+                print('--\ncurrent folder: ' + root)
+
+            for file in files:
+                # if the file it's a Thumbs.db cache file, skip it
+                if check_cache_file(file):
                     continue
-                n_files += 1
-                if self.print_folders:
-                    print('\t[{}/{} files processed ({:.1f}%)] - file {} '.format(n_files, self.tot_files, 100 * n_files / self.tot_files, filename))
-                out_path_file, out_path_dir = self._make_output_path(patient_folder,
-                                                               filename)
-                in_path_file = os.path.join(root, filename)
+
+                # check if the file has already been processed in another run, if yes skip it
+                if search_str(self.record_path, os.path.join(root, file)):
+                    # add the file to the list of ignored files since we are not going to process it in this run
+                    ignored_files.append(os.path.join(root, file))
+                    # show info in the log
+                    self._show_info(file, skipping=True)
+                    continue
+
+                # show info in the log
+                self._show_info(file)
+
+                # out_path_file is the path where we are going to convert our file to pdf, out_path_dir is the
+                out_path_file, out_path_dir = self._make_output_path(patient_folder, file)
+                # the path where the file "filename" is currently stored
+                in_path_file = os.path.join(root, file)
+                # convert the file "filename" to
                 error_msg = file_to_pdf(in_path_file, out_path_file, verbose=self.print_folders)
                 if error_msg is None:
-                    file_relative_path_from_patient_folder = in_path_file[len(patient_folder)+2:]
-                    #self._add_header(out_path_file, file_relative_path_from_patient_folder)
                     txt_path = self._update_info_txt(in_path_file, out_path_file, out_path_dir)
                     if txt_path_previous is None:
                         txt_path_previous = txt_path
                 else:
+                    append_str(self.err_path, error_msg)
                     not_converted_files.append([in_path_file, error_msg])
 
-                if not self.print_folders:
-                    charge_bar.update(n=1)
+                # The file has been processed, so add it to the self.record_path file
+                append_str(self.record_path, os.path.join(root, file))
 
             if txt_path_previous != txt_path:
                 try:
-                    self._merge_pdfs(txt_path_previous)
-                    self._make_metadata(txt_path_previous)
+                    merge_pdfs(txt_path_previous)
+                    make_metadata(txt_path_previous)
                 except Exception as e:
-                    with open(self.err_path, 'a') as f:
-                        print(e)
-                        f.write(str(e))
-                        f.write('\n\n\n')
+                    append_str(self.err_path, str(e))
                 txt_path_previous = txt_path
 
         try:
-            self._merge_pdfs(txt_path)
-            self._make_metadata(txt_path)
+            merge_pdfs(txt_path)
+            make_metadata(txt_path)
         except Exception as e:
-            with open(self.err_path, 'a') as f:
-                print(e)
-                f.write(str(e))
-                f.write('\n\n\n')
+            append_str(self.err_path, str(e))
+
         if not self.print_folders:
-            charge_bar.close()
+            self.charge_bar.close()
 
         self._save_log(not_converted_files, ignored_files)
 
@@ -151,7 +352,7 @@ class DataFormatter:
             writer = csv.writer(f)
             writer.writerow(header)
             for patient_data in patients_data:
-                #if the case id is None we don't save the patient
+                # if the case id is None we don't save the patient
                 if patient_data[3] is None:
                     continue
                 writer.writerow(patient_data)
@@ -170,7 +371,7 @@ class DataFormatter:
         previous_patient_folder = None
 
         for root, subdirs, files in os.walk(self.abs_in_path):
-            patient_folder = self._get_patient_folder(root, patient_folder)
+            patient_folder = get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
                 patient, _ = break_path(patient_folder)
                 print(patient)
@@ -180,122 +381,21 @@ class DataFormatter:
 
     def _count_files(self):
         count = 0
-        for _, _, files in os.walk(self.abs_in_path):
+        patient_folder = None
+        for root, _, files in os.walk(self.abs_in_path):
+            patient_folder = get_patient_folder(root, patient_folder)
+            # if the current root is not inside a patient_folder, continue
+            if patient_folder is None:
+                continue
             for file in files:
-                if not self._check_cache_file(file):
-                    count += 1
-        return count
-
-    #Thumbs.db files are cache files generated to load faster image previews
-    @staticmethod
-    def _check_cache_file(file_path):
-        filename, _ = break_path(file_path)
-        if filename == 'Thumbs.db':
-            return True
-        return False
-
-    def _get_patient_folder(self, root, patient_folder):
-        if patient_folder is not None and patient_folder in root:
-            return patient_folder
-
-        # if I didn't traverse one of the invalid folders yet, the current folder can't be a patient folder
-        check_parent_folders = [folder in root for folder in invalid_folders]
-        if not any(check_parent_folders):
-            return None
-
-        # if the current folder is an invalid folder, can't be a patient folder
-        current_folder, _ = break_path(root)
-        check_current_folder = [folder in current_folder for folder in invalid_folders]
-        if any(check_current_folder):
-            return None
-
-        return root
-
-    @staticmethod
-    def _extract_patient_data(patient):
-        first_name = None
-        last_name = None
-        birthday = None
-        case_nr = None
-
-        skip_words = ['', '-', 'geb', 'fallnr', 'fall-nr', 'fr', 'frau', 'hr', 'herr', 'der', 'auf',
-                      'zim', 'nf', 'unbekannt', 'tumorwunde', 'hausarzt']
-
-        patient_data = patient.split(' ')
-        # remove geb. in front of the date
-        patient_data = [datum.replace('geb.', '') for datum in patient_data]
-
-        # remove ',' and '-' from beginning and end of words
-        patient_data = [datum.strip(' ,-.') for datum in patient_data]
-
-        # remove words in the skip_words list
-        patient_data = [datum for datum in patient_data if not datum.lower() in skip_words]
-
-        # first find the birthday, and remove it from the list patient_data
-        prov_patient_data = []
-        for datum in patient_data:
-            try:
-                if date_parse(datum):
-                    birthday = datum
-                    prov_patient_data.append('birthday')
+                # if it's a cache file skip it
+                if check_cache_file(file):
                     continue
-            except:
-                pass
-            prov_patient_data.append(datum)
-        patient_data = prov_patient_data
-
-        # separate words if they are separated with a comma or a dot
-        prov_patient_data = []
-        for datum in patient_data:
-            prov = []
-            splitted = datum.split(',')
-            for word in splitted:
-                prov.extend(word.split('.'))
-            for word in prov:
-                if word != '':
-                    prov_patient_data.append(word)
-        patient_data = prov_patient_data
-
-        # here we remove the doctor name and we isolate the fall_nr
-        skip_doctor = False
-        prov_patient_data = []
-        for datum in patient_data:
-            if skip_doctor:
-                if len(datum) > 1:
-                    skip_doctor = False
-                continue
-            if datum.lower() == 'dr' or datum.lower() == 'prof' or datum.lower() == 'd':
-                skip_doctor = True
-                continue
-            # remove nf-zentrum, nf-arzt
-            if 'nf-' in datum.lower():
-                continue
-            if datum.isnumeric() and len(datum) > 5:
-                case_nr = datum
-                continue
-            prov_patient_data.append(datum)
-        patient_data = prov_patient_data
-
-        # delete all remaining numeric data
-        prov_patient_data = []
-        for datum in patient_data:
-            if datum.isnumeric():
-                continue
-            prov_patient_data.append(datum)
-        patient_data = prov_patient_data
-
-        if patient_data:
-            first_name = patient_data[0]
-            if len(patient_data) > 1:
-                if patient_data[1] != 'birthday':
-                    last_name = patient_data[1]
-                    if len(patient_data) > 2:
-                        for i in range(2, len(patient_data)):
-                            if patient_data[i] == 'birthday':
-                                break
-                            last_name += ' ' + patient_data[i]
-
-        return [first_name, last_name, birthday, case_nr]
+                # if we already processed this file in another run (and therefore is saved into record_path), skip it
+                if search_str(self.record_path, os.path.join(root, file)):
+                    continue
+                count += 1
+        return count
 
     def _extract_patients_data(self):
         patient_folder = None
@@ -303,61 +403,23 @@ class DataFormatter:
         patients_data = []
 
         for root, subdirs, files in os.walk(self.abs_in_path):
-            patient_folder = self._get_patient_folder(root, patient_folder)
+            patient_folder = get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
                 patient, _ = break_path(patient_folder)
-                patient_data = self._extract_patient_data(patient)
+                patient_data = extract_patient_data(patient)
                 patients_data.append(patient_data)
                 previous_patient_folder = patient_folder
 
         return patients_data
 
-    def _make_metadata(self, txt_path):
-        _, txt_path_root = break_path(txt_path)
-        patient, _ = break_path(txt_path_root)
-        metadata_path = os.path.join(txt_path_root, patient + '.jpl')
-        _, metadata_dir = break_path(metadata_path)
-        make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
-
-        first_name, last_name, birthday, case_nr = self._extract_patient_data(patient)
-        with open(metadata_path, 'w') as f:
-            f.write('dokuart = "DMDOK"\n')
-            f.write('logi_verzeichnis = "Freigabe"\n')
-            documentation = 'Wunddokumentation' if 'Wunddoku' in txt_path_root else 'Stomadokumentation'
-            f.write('dok_dat_feld[3] = "MCC AA ' + documentation + ' Migration"\n')
-            f.write('dok_dat_feld[5] = "' + documentation + '"\n')
-            f.write('dok_dat_feld[7] = "' + case_nr + '"\n')
-            if first_name is not None:
-                f.write('dok_dat_feld[11] = "' + first_name + '"\n')
-            else:
-                print('WARNING: was not possible to extract the first name in patient: {}'.format(patient))
-            if last_name is not None:
-                f.write('dok_dat_feld[12] = "' + last_name + '"\n')
-            else:
-                print('WARNING: was not possible to extract the last name in patient: {}'.format(patient))
-            f.write('dok_dat_feld[14] = "Migrationsdokument"\n')
-            f.write('dok_dat_feld[15] = "2080"\n')
-            f.write('dok_dat_feld[16] = "MCC HLT"\n')
-            today = date.today()
-            today_str = today.strftime("%d.%m.%y")
-            f.write('dok_dat_feld[50] = "' + today_str + '"\n')
-            f.write('dok_dat_feld[52] = "' + today_str + '"\n')
-            if birthday is not None:
-                f.write('dok_dat_feld[53] = "' + birthday + '"\n')
-            else:
-                print('WARNING: was not possible to extract the birthday in patient: {}'.format(patient))
-
     # given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
     # and the filename, create the output_path_dir if it doesn't exis yet, and output the dir_path and file_path
-    #TODO use abs_in_path instead of input_folder
     def _make_output_path(self, patient_folder, filename):
-        #idx = patient_folder.find(input_folder)
-        #output_path_dir = patient_folder[:idx] + output_folder + patient_folder[idx+len(input_folder):]
         output_path_dir = self.abs_out_path + patient_folder[len(self.abs_in_path):]
         make_dir(Path(output_path_dir))
-        _, file = get_format(filename) #file is filename without '.format'
+        _, file = get_format(filename)  # file is filename without '.format'
 
-        #make sure that all the files have a distinct name
+        # make sure that all the files have a distinct name
         idx = 0
         while True:
             out_filename = file + str(idx) + '.pdf'
@@ -368,44 +430,14 @@ class DataFormatter:
                 break
         return output_path_file, output_path_dir
 
-    @staticmethod
-    def _merge_pdfs(txt_path):
-        _, txt_path_root = break_path(txt_path)
-        patient, _ = break_path(txt_path_root)
-        with open(txt_path) as f:
-            lines = f.readlines()
-        files = []
-        for i in range(len(lines) // 2):
-            path = re.sub('\n', '', lines[2 * i])
-            time = float(re.sub('\n', '', lines[2 * i + 1]))
-            files.append([path, time])
-        key = lambda x: x[1]
-        files = sorted(files, key=lambda x: x[1])
-        paths = [file[0] for file in files]
-
-        merger = PdfMerger()
-
-        for pdf in paths:
-            merger.append(pdf)
-
-        _, root = break_path(txt_path)
-        filename = patient + '.pdf'
-        merge_path = os.path.join(root, filename)
-        merger.write(merge_path)
-        merger.close()
-
-        # remove pdfs and txt file
-        os.remove(txt_path)
-        for pdf in paths:
-            os.remove(pdf)
-
     def _save_log(self, not_converted_files, ignored_files, verbose=True):
 
-        #save in the log ignored and not converted files
+        # save in the log ignored and not converted files
         with open(self.log_path, 'a') as f:
             if ignored_files:
-                f.write('The following {} files out of the total {} files have been ignored since the patient folder was missing '
-                        'the id number:\n\n'.format(len(ignored_files), self.tot_files))
+                f.write(
+                    'The following {} files out of the total {} files have been ignored since the patient folder was missing '
+                    'the id number:\n\n'.format(len(ignored_files), self.tot_files))
                 for path, patient in ignored_files:
                     f.write('Patient: {}\nPath: {}\n\n'.format(patient, path))
                 f.write('\n')
@@ -423,7 +455,7 @@ class DataFormatter:
             if not ignored_files and not_converted_files:
                 f.write('All the {} files have been successfully converted.'.format(tot_files))
 
-        #print the log
+        # print the log
         if verbose:
             with open(self.log_path, 'r') as f:
                 lines = f.readlines()
@@ -440,7 +472,18 @@ class DataFormatter:
             else:
                 path_time = str(os.path.getmtime(in_path_file))
             file.write(out_path_file + '\n' + path_time + '\n')
-        return txt_path
+        return txt_pathù
 
-
-
+    def _show_info(self, file, skipping=False):
+        skipping_text = ''
+        if skipping:
+            skipping_text = 'skipped because already processed in a previous run '
+        if self.print_folders:
+            # update the file counter
+            self.n_files += 1
+            # print infos about the file
+            print('\t[{}/{} files processed ({:.1f}%)] - file {}{} '
+                  .format(self.n_files, self.tot_files, 100 * self.n_files / self.tot_files, skipping_text, file))
+        else:
+            # update the charging bar
+            self.charge_bar.update(n=1)

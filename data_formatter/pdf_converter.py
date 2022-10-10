@@ -7,14 +7,26 @@ from fpdf import FPDF
 import extract_msg
 import os
 from PyPDF2 import PdfMerger
-#from multiprocessing import Process, Manager
-#import time
-
 #XLSX vs XLS, DOC vs DOCX
 
+#TODO: put the exact names on the msg and the docx exceptions
 def file_to_pdf(in_path, out_path, verbose=False):
+    """
+    Convert a file stored in in_path to PDF and store the new PDF file in out_path.
+    The supported data formats are: docx, jpg, msg, pdf, png, pptx, txt, xlsx
+
+    :param in_path: str. path to the file that you want to convert to PDF
+    :param out_path: str. path where to store the new PDF file
+    :param verbose: bool. If true print the error message
+    :return: error_msg: str.
+    """
     data_format, _ = get_format(in_path)
     data_format = data_format.lower()  # This fix any upper/lower case problem (e.g. .JPG vs .jpg)
+    #in_path = '\\\\?\\' + in_path # To avoid the 255 characters limit problem
+    if data_format == 'doc':
+        data_format = 'docx'
+    elif data_format == 'xls':
+        data_format = 'xlsx'
     try:
         eval(data_format + '_to_pdf(in_path, out_path)')
         return None
@@ -28,46 +40,13 @@ def file_to_pdf(in_path, out_path, verbose=False):
         if verbose:
             print("\t" + error_msg)
     except Exception as e:
-        error_msg = "Was not possible to convert the file. This may happen if the file is damaged or temporary."
+        if data_format == 'msg':
+            error_msg = "You don't have the permission to open the following email: {}.".format(in_path)
+        else:
+            error_msg = str(e)
         if verbose:
-            #print("\t" + error_msg )
-            print("\t" + str(e))
+            print("\t" + error_msg )
         return error_msg
-
-
-def pdf_to_pdf(in_path, out_path):
-    shutil.copy(in_path, out_path)
-
-
-def jpg_to_pdf(in_path, out_path):
-    image = Image.open(in_path)
-    im = image.convert('RGB')
-    im.save(out_path)
-    im.close()
-
-
-def png_to_pdf(in_path, out_path):
-    image = Image.open(in_path)
-    im = image.convert('RGB')
-    im.save(out_path)
-    im.close()
-
-
-def xlsx_to_pdf(in_path, out_path):
-    excel = client.Dispatch("Excel.Application")
-    excel.Visible = True
-    sheets = None
-    try:
-        sheets = excel.Workbooks.Open(in_path)
-        work_sheets = sheets.Worksheets[0]
-        work_sheets.ExportAsFixedFormat(0, out_path)
-    except Exception as error:
-        raise error
-    finally:
-        if sheets is not None:
-            sheets.Close()
-        excel.Visible = False
-        excel.Quit()
 
 
 def docx_to_pdf(in_path, out_path):
@@ -86,25 +65,19 @@ def docx_to_pdf(in_path, out_path):
         word.Quit()
 
 
-def pptx_to_pdf(in_path, out_path):
-    powerpoint = comtypes.client.CreateObject("Powerpoint.Application")
-    powerpoint.Visible = 1
-    deck = None
-    try:
-        deck = powerpoint.Presentations.Open(in_path)
-        deck.SaveAs(out_path, 32)  # formatType = 32 for ppt to pdf
-    except Exception as error:
-        raise error
-    finally:
-        deck.Close()
-        powerpoint.Quit()
+def jpg_to_pdf(in_path, out_path):
+    image = Image.open(in_path)
+    im = image.convert('RGB')
+    im.save(out_path)
+    im.close()
 
 
-# work on the attachement
 def msg_to_pdf(in_path, out_path):
     _, out_path_prov = get_format(out_path)
     out_path_prov = out_path_prov + '.msg'
-    out_path_prov_dir = 'email'
+    _, root_in_path = break_path(in_path)
+    out_path_prov_dir = os.path.join(root_in_path, 'email')
+    print('*** msg debugging. Out path prov: {}, dir: {}'.format(out_path_prov, out_path_prov_dir))
 
     shutil.copy(in_path, out_path_prov)
     msg = extract_msg.Message(out_path_prov)  # This will create a local 'msg' object for each email in direcory
@@ -145,6 +118,31 @@ def msg_to_pdf(in_path, out_path):
     shutil.rmtree(out_path_prov_dir)
 
 
+def pdf_to_pdf(in_path, out_path):
+    shutil.copy(in_path, out_path)
+
+
+def png_to_pdf(in_path, out_path):
+    image = Image.open(in_path)
+    im = image.convert('RGB')
+    im.save(out_path)
+    im.close()
+
+
+def pptx_to_pdf(in_path, out_path):
+    powerpoint = comtypes.client.CreateObject("Powerpoint.Application")
+    powerpoint.Visible = 1
+    deck = None
+    try:
+        deck = powerpoint.Presentations.Open(in_path)
+        deck.SaveAs(out_path, 32)  # formatType = 32 for ppt to pdf
+    except Exception as error:
+        raise error
+    finally:
+        deck.Close()
+        powerpoint.Quit()
+
+
 def txt_to_pdf(in_path, out_path):
     pdf = FPDF()
 
@@ -156,3 +154,23 @@ def txt_to_pdf(in_path, out_path):
     for x in f:
         pdf.cell(200, 10, txt=x, ln=1, align='C')
     pdf.output(out_path)
+
+
+def xlsx_to_pdf(in_path, out_path):
+    excel = client.Dispatch("Excel.Application")
+    excel.Visible = True
+    sheets = None
+    try:
+        sheets = excel.Workbooks.Open(in_path)
+        work_sheets = sheets.Worksheets[0]
+        work_sheets.ExportAsFixedFormat(0, out_path)
+    except Exception as error:
+        raise error
+    finally:
+        if sheets is not None:
+            sheets.Close()
+        excel.Visible = False
+        excel.Quit()
+
+
+
