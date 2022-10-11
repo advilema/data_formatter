@@ -9,7 +9,6 @@ import os
 from PyPDF2 import PdfMerger
 #XLSX vs XLS, DOC vs DOCX
 
-#TODO: put the exact names on the msg and the docx exceptions
 def file_to_pdf(in_path, out_path, verbose=False):
     """
     Convert a file stored in in_path to PDF and store the new PDF file in out_path.
@@ -40,11 +39,11 @@ def file_to_pdf(in_path, out_path, verbose=False):
             print("\t" + error_msg)
     except Exception as e:
         if data_format == 'msg':
-            error_msg = "You don't have the permission to open the following email: {}.".format(in_path)
+            error_msg = "You don't have the permission to open the email."
         else:
             error_msg = str(e)
         if verbose:
-            print("\t" + error_msg )
+            print("\t" + error_msg)
         return error_msg
 
 
