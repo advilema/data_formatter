@@ -1,27 +1,12 @@
 import os
 from pathlib import Path
 
-#break the path into format and filename without format
-def get_format(path):
-    i = 1
-    while i < len(path):
-        if path[-i] == '.':
-            return path[-i+1:], path[:-i]
-        i += 1
-    return None, path
 
-# From the absolute path, get the folder name and the root
-def break_path(path):
-    i = len(path) - 1
-    char = path[-i]
-    while char != "\\" and i >= 0:
-        i -= 1
-        char = path[i]
-    return path[i + 1:], path[:i]
-
-    #check if a path is an existing folder. If not it creates it
 
 def make_dir(path):
+    """
+    check if a path is an existing folder. If not it creates it
+    """
     if not os.path.isdir(path):
         make_dir(path.parent)
         os.mkdir(path)
@@ -79,3 +64,52 @@ def make_file(file_path):
     make_dir(Path(dir_path))
     with open(file_path, 'w') as f:
         f.write('')
+
+
+def get_root(path):
+    """
+    Return the root of the path, which is considered as the path minus the directory name
+    """
+    i = len(path) - 1
+    char = path[-i]
+    while char != "\\" and i >= 0:
+        i -= 1
+        char = path[i]
+    return path[:i]
+
+
+def get_directory_name(path):
+    """
+    Return the directory name of the path, which is considered as the path minus the root
+    """
+    i = len(path) - 1
+    char = path[-i]
+    while char != "\\" and i >= 0:
+        i -= 1
+        char = path[i]
+    return path[i + 1:]
+
+
+def get_format(file_pat):
+    """
+    Return the data format of the file. Will be considered as data format the substring after the rightmost dot in
+    the file_path
+    """
+    i = 1
+    while i < len(file_pat):
+        if file_pat[-i] == '.':
+            return file_pat[-i + 1:]
+        i += 1
+    return None, file_pat
+
+
+def remove_data_format(file_pat):
+    """
+    Return the substring on the left of the rightmost dot in the file_path
+    """
+    i = 1
+    while i < len(file_pat):
+        if file_pat[-i] == '.':
+            return file_pat[:-i]
+        i += 1
+    return file_pat

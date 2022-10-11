@@ -1,5 +1,5 @@
 import shutil
-from data_formatter.util import get_format, break_path
+from data_formatter.util import get_format, get_root, get_directory_name, remove_data_format
 from PIL import Image
 import comtypes.client
 from win32com import client
@@ -20,9 +20,8 @@ def file_to_pdf(in_path, out_path, verbose=False):
     :param verbose: bool. If true print the error message
     :return: error_msg: str.
     """
-    data_format, _ = get_format(in_path)
+    data_format = get_format(in_path)
     data_format = data_format.lower()  # This fix any upper/lower case problem (e.g. .JPG vs .jpg)
-    #in_path = '\\\\?\\' + in_path # To avoid the 255 characters limit problem
     if data_format == 'doc':
         data_format = 'docx'
     elif data_format == 'xls':
@@ -73,16 +72,18 @@ def jpg_to_pdf(in_path, out_path):
 
 
 def msg_to_pdf(in_path, out_path):
-    _, out_path_prov = get_format(out_path)
+    out_path_prov = remove_data_format(out_path)
     out_path_prov = out_path_prov + '.msg'
-    _, root_in_path = break_path(in_path)
+    _, root_in_path = get_root(in_path)
     out_path_prov_dir = os.path.join(root_in_path, 'email')
     print('*** msg debugging. Out path prov: {}, dir: {}'.format(out_path_prov, out_path_prov_dir))
 
     shutil.copy(in_path, out_path_prov)
     msg = extract_msg.Message(out_path_prov)  # This will create a local 'msg' object for each email in direcory
+    # This will create a separate folder and save a text file with email body content, also it will download all
+    # attachments inside this folder.
     msg.save(
-        customFilename=out_path_prov_dir)  # This will create a separate folder and save a text file with email body content, also it will download all attachments inside this folder.
+        customFilename=out_path_prov_dir)
     msg.close()
     os.remove(out_path_prov)
 
@@ -90,7 +91,7 @@ def msg_to_pdf(in_path, out_path):
     for root, _, files in os.walk(out_path_prov_dir):
         for file in files:
             in_file_path = os.path.join(root, file)
-            filename, _ = break_path(in_file_path)
+            filename = get_directory_name(in_file_path)
             _, filename = get_format(filename)
             out_file_path = os.path.join(out_path_prov_dir, filename + '.pdf')
             file_to_pdf(in_file_path, out_file_path)

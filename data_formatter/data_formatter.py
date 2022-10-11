@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pdf2image import convert_from_path
 from PIL import Image, ImageFont, ImageDraw
 from PyPDF2 import PdfMerger
-from data_formatter.util import break_path, get_format, make_dir, search_str, append_str, check_cache_file, make_file
+from data_formatter.util import get_format, make_dir, search_str, append_str, check_cache_file, make_file, get_root, get_directory_name, remove_data_format
 from data_formatter.pdf_converter import file_to_pdf, jpg_to_pdf
 
 invalid_folders = ['Arch', 'Stoma', 'Wund', 'Patientenunterlagen']
@@ -110,17 +110,13 @@ def extract_patient_data(patient: str) -> list[str, str, str, str]:
 
 def get_patient_folder(root, patient_folder):
     """
-
-    :param self:
-    :param root:
-    :param patient_folder:
-    :return:
+    Given the root, and the previous patient_folder, return the new patient_folder
     """
     # in this case our current folder is inside the patient_folder, so we simply return the patient_folder
     if patient_folder is not None and patient_folder in root:
         return patient_folder
 
-    current_folder, _ = break_path(root)
+    current_folder = get_directory_name(root)
     [_, _, _, case_nr] = extract_patient_data(current_folder)
 
     # if the current_folder has a case_nr is a patient_folder. So return the path
@@ -132,9 +128,12 @@ def get_patient_folder(root, patient_folder):
 
 
 def merge_pdfs(txt_path):
-    # TODO: consider putting this into the pdf_converter file, or somewhere else
-    _, txt_path_root = break_path(txt_path)
-    patient, _ = break_path(txt_path_root)
+    """
+    Given a txt file with a list of PDF files and their creation times, merge these files in a single PDF according to
+    the files creation times
+    """
+    txt_path_root = get_root(txt_path)
+    patient = get_directory_name(txt_path_root)
     with open(txt_path) as f:
         lines = f.readlines()
     files = []
@@ -151,7 +150,7 @@ def merge_pdfs(txt_path):
     for pdf in paths:
         merger.append(pdf)
 
-    _, root = break_path(txt_path)
+    root = get_root(txt_path)
     [first_name, last_name, birthday, case_nr] = extract_patient_data(patient)
     filename = first_name + ', ' + last_name + ' Fall-Nr ' + case_nr + '.pdf'
     merge_path = os.path.join(root, filename)
@@ -165,12 +164,15 @@ def merge_pdfs(txt_path):
 
 
 def make_metadata(txt_path):
-    _, txt_path_root = break_path(txt_path)
-    patient, _ = break_path(txt_path_root)
+    """
+    Create the metadata .jpl file
+    """
+    txt_path_root = get_root(txt_path)
+    patient = get_directory_name(txt_path_root)
     [first_name, last_name, birthday, case_nr] = extract_patient_data(patient)
     filename = first_name + ', ' + last_name + ' Fall-Nr ' + case_nr + '.jpl'
     metadata_path = os.path.join(txt_path_root, filename)
-    _, metadata_dir = break_path(metadata_path)
+    metadata_dir = get_root(metadata_path)
     make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
 
     first_name, last_name, birthday, case_nr = extract_patient_data(patient)
@@ -268,12 +270,16 @@ class DataFormatter:
         make_file(self.log_path)
         make_file(self.err_path)
 
-        self.n_files = 0
-        patient_folder = None
-        not_converted_files = []
-        ignored_files = []
+        self.n_files = 0  # set the count of the files that have already been processed to 0
+        not_converted_files = []  # these will be the files that was not possible to convert to PDF because of some error
+        ignored_files = []  # These will be the files that have already been processed in a previous run of the algorithm, and therefore skipped this time
+        patient_folder = None  # the current patient folder
+
+        # txt_path is the path where to store the temporary txt file that keeps track of all the files converted to PDF
+        # for a given patient. Once all the PDF files for a given patient have been merged, this temporary file is
+        # deleted
         txt_path = None
-        txt_path_previous = None
+        txt_path_previous = None  # txt_path of the previous round
 
         if self.print_folders:
             print('A total of {} files will be processed.\n'.format(self.tot_files))
@@ -308,42 +314,58 @@ class DataFormatter:
                 self._show_info(file)
 
                 # out_path_file is the path where we are going to convert our file to pdf, out_path_dir is the
+                # new patient folder in the self.abs_out_path folder
                 out_path_file, out_path_dir = self._make_output_path(patient_folder, file)
-                # the path where the file "filename" is currently stored
-                in_path_file = os.path.join(root, file)
-                # convert the file "filename" to
+                in_path_file = os.path.join(root, file) # the path where the file is currently stored
+                # convert the file to pdf and save the pdf in the out_path_file, generate an error message
                 error_msg = file_to_pdf(in_path_file, out_path_file, verbose=self.print_folders)
                 if error_msg is None:
+                    # if error_msg is None means that the file has been converted to pdf successfully, therefore we add
+                    # the file to a temporary txt_file that keep track of all the converted pdf files for a given patient
                     txt_path = self._update_info_txt(in_path_file, out_path_file, out_path_dir)
                     if txt_path_previous is None:
                         txt_path_previous = txt_path
                 else:
+                    # if there is an error message it means that the conversion of the file didn't happen. We save the
+                    # error message in the err_path file, and we add the file to the list of the non_converted_files
                     append_str(self.err_path, error_msg)
                     not_converted_files.append([in_path_file, error_msg])
 
                 # The file has been processed, so add it to the self.record_path file
                 append_str(self.record_path, os.path.join(root, file))
 
+            # merge all the PDF files of the previous patient (in fact, if txt_path_previous != txt_path it means that
+            # the current patient is different from the previous one, which means that all the files of the previous
+            # patient have been already processed, and the PDFs can be merged)
             if txt_path_previous != txt_path:
                 try:
                     merge_pdfs(txt_path_previous)
                     make_metadata(txt_path_previous)
                 except Exception as e:
+                    # handle errors in the merging process
                     append_str(self.err_path, str(e))
                 txt_path_previous = txt_path
 
+        # remember to merge all the files of the last patient as well
         try:
             merge_pdfs(txt_path)
             make_metadata(txt_path)
         except Exception as e:
+            # handle errors in the merging process
             append_str(self.err_path, str(e))
 
         if not self.print_folders:
+            # terminate the charge_bar once the formatting is complete
             self.charge_bar.close()
 
+        # save the not_converted_files and the ignored_files in the log
         self._save_log(not_converted_files, ignored_files)
 
     def extract_csv(self):
+        """
+        Create a CSV file with all the patients in the folder, where the columns are 'Vorname', 'Nachname',
+        'Geburtstag', 'Fall-nr'
+        """
         csv_path = os.path.join(self.abs_out_path, 'csv_file.csv')
         header = ['Vorname', 'Nachname', 'Geburtstag', 'Fall-nr']
         patients_data = self._extract_patients_data()
@@ -361,7 +383,7 @@ class DataFormatter:
         """
         Extract all the patient folders and save them in the log file
         """
-        _, log_dir = break_path(self.log_path)
+        log_dir = get_root(self.log_path)
         make_dir(Path(log_dir))
         # clear the log file if there exist already one
         with open(self.log_path, 'w') as f:
@@ -373,13 +395,16 @@ class DataFormatter:
         for root, subdirs, files in os.walk(self.abs_in_path):
             patient_folder = get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
-                patient, _ = break_path(patient_folder)
-                print(patient)
+                patient = get_directory_name(patient_folder)
                 with open(self.log_path, 'a') as f:
                     f.write(patient + '\n')
                 previous_patient_folder = patient_folder
 
     def _count_files(self):
+        """
+        Count all the files inside the self.abs_in_path that are inside a valid patient folder (with existing case_nr)
+        and that are not cache files
+        """
         count = 0
         patient_folder = None
         for root, _, files in os.walk(self.abs_in_path):
@@ -395,6 +420,10 @@ class DataFormatter:
         return count
 
     def _extract_patients_data(self):
+        """
+        Exctract all the patients data from their patient folder name (first name, last name, birthday, case nr), and
+        return them into a vector
+        """
         patient_folder = None
         previous_patient_folder = None
         patients_data = []
@@ -402,7 +431,7 @@ class DataFormatter:
         for root, subdirs, files in os.walk(self.abs_in_path):
             patient_folder = get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
-                patient, _ = break_path(patient_folder)
+                patient = get_directory_name(patient_folder)
                 patient_data = extract_patient_data(patient)
                 patients_data.append(patient_data)
                 previous_patient_folder = patient_folder
@@ -412,9 +441,13 @@ class DataFormatter:
     # given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
     # and the filename, create the output_path_dir if it doesn't exis yet, and output the dir_path and file_path
     def _make_output_path(self, patient_folder, filename):
+        """
+        given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
+        and the filename, create the output_path_dir if it doesn't exist yet, and return the dir_path and file_path
+        """
         output_path_dir = self.abs_out_path + patient_folder[len(self.abs_in_path):]
         make_dir(Path(output_path_dir))
-        _, file = get_format(filename)  # file is filename without '.format'
+        file = remove_data_format(filename)  # file is filename without '.format'
 
         # make sure that all the files have a distinct name
         idx = 0
@@ -461,8 +494,10 @@ class DataFormatter:
                 for line in lines:
                     print(line, end='')
 
-    # update (create if doesn't exist yet) the txt file with the time creation of the in_path_file
     def _update_info_txt(self, in_path_file, out_path_file, out_path_dir):
+        """
+        update (create, if doesn't exist yet) the txt file with the time creation of the in_path_file
+        """
         txt_path = os.path.join(out_path_dir, 'info.txt')
         with open(txt_path, "a+") as file:
             if self.time_order == 'creation':
