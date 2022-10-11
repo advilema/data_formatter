@@ -261,7 +261,7 @@ class DataFormatter:
 
     def format(self):
         """
-        format the files into the patient folders in the self.abs_in_path folder, and save the formatted file in the
+        Format the files into the patient folders in the self.abs_in_path folder, and save the formatted file in the
         abs_out_path folder
         """
         # initialize the log file and the err file
@@ -434,10 +434,10 @@ class DataFormatter:
             tot_files = self.tot_files
             if ignored_files:
                 f.write(
-                    'The following {} files out of the total {} files have been ignored since the patient folder was missing '
-                    'the id number:\n\n'.format(len(ignored_files), self.tot_files))
-                for path, patient in ignored_files:
-                    f.write('Patient: {}\nPath: {}\n\n'.format(patient, path))
+                    'The following {} files out of the total {} files have been ignored since they have been already '
+                    'processed in a previous run:\n\n'.format(len(ignored_files), self.tot_files))
+                for path in ignored_files:
+                    f.write('Path: {}\n\n'.format(path))
                 f.write('\n')
                 tot_files = self.tot_files - len(ignored_files)
             if not_converted_files:
