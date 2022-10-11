@@ -434,6 +434,7 @@ class DataFormatter:
 
         # save in the log ignored and not converted files
         with open(self.log_path, 'a') as f:
+            tot_files = self.tot_files
             if ignored_files:
                 f.write(
                     'The following {} files out of the total {} files have been ignored since the patient folder was missing '
@@ -453,7 +454,7 @@ class DataFormatter:
                     f.write('Error: {}\nPath: {}\n\n'.format(err, path))
 
             if not ignored_files and not_converted_files:
-                f.write('All the {} files have been successfully converted.'.format(tot_files))
+                f.write('All the {} files have been successfully converted.'.format(self.tot_files))
 
         # print the log
         if verbose:
