@@ -391,9 +391,6 @@ class DataFormatter:
                 # if it's a cache file skip it
                 if check_cache_file(file):
                     continue
-                # if we already processed this file in another run (and therefore is saved into record_path), skip it
-                if search_str(self.record_path, os.path.join(root, file)):
-                    continue
                 count += 1
         return count
 
