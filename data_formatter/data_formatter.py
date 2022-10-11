@@ -472,7 +472,7 @@ class DataFormatter:
             else:
                 path_time = str(os.path.getmtime(in_path_file))
             file.write(out_path_file + '\n' + path_time + '\n')
-        return txt_pathù
+        return txt_path
 
     def _show_info(self, file, skipping=False):
         skipping_text = ''
