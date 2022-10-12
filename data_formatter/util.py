@@ -53,14 +53,14 @@ def check_cache_file(file_path: str) -> bool:
 
     Return False if the file is not a .db file, otherwise return True.
     """
-    filename, _ = break_path(file_path)
+    filename = get_directory_name(file_path)
     if filename == 'Thumbs.db':
         return True
     return False
 
 
 def make_file(file_path):
-    _, dir_path = break_path(file_path)
+    dir_path = get_root(file_path)
     make_dir(Path(dir_path))
     with open(file_path, 'w') as f:
         f.write('')
