@@ -195,7 +195,7 @@ def make_metadata(txt_path):
         f.write('dok_dat_feld[15] = "2080"\n')
         f.write('dok_dat_feld[16] = "MCC HLT"\n')
         today = date.today()
-        today_str = today.strftime("%d.%m.%y")
+        today_str = today.strftime("%d.%m.%Y")
         f.write('dok_dat_feld[50] = "' + today_str + '"\n')
         f.write('dok_dat_feld[52] = "' + today_str + '"\n')
         if birthday is not None:
@@ -259,13 +259,16 @@ class DataFormatter:
                 self.record_path = record_path
             else:
                 self.record_path = os.path.join(cwd, record_path)
-        self.tot_files = self._count_files()
 
     def format(self):
         """
         Format the files into the patient folders in the self.abs_in_path folder, and save the formatted file in the
         abs_out_path folder
         """
+        # count the files in the folders
+        print('Counting the files in the folder ...')
+        self.tot_files = self._count_files()
+        
         # initialize the log file and the err file
         make_file(self.log_path)
         make_file(self.err_path)
@@ -366,11 +369,13 @@ class DataFormatter:
         Create a CSV file with all the patients in the folder, where the columns are 'Vorname', 'Nachname',
         'Geburtstag', 'Fall-nr'
         """
+        print('\nExtracting patients information from the folders ...')
         csv_path = os.path.join(self.abs_out_path, 'csv_file.csv')
         header = ['Vorname', 'Nachname', 'Geburtstag', 'Fall-nr']
         patients_data = self._extract_patients_data()
 
-        with open(csv_path, 'w', encoding='UTF8') as f:
+        print('Creating the csv file ...')
+        with open(csv_path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for patient_data in patients_data:
@@ -378,6 +383,7 @@ class DataFormatter:
                 if patient_data[3] is None:
                     continue
                 writer.writerow(patient_data)
+        print('Done!')
 
     def extract_patient_folders(self):
         """

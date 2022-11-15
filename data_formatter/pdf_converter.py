@@ -7,6 +7,7 @@ from fpdf import FPDF
 import extract_msg
 import os
 from PyPDF2 import PdfMerger
+from textwrap import TextWrapper
 #XLSX vs XLS, DOC vs DOCX
 
 def file_to_pdf(in_path, out_path, verbose=False):
@@ -25,6 +26,8 @@ def file_to_pdf(in_path, out_path, verbose=False):
         data_format = 'docx'
     elif data_format == 'xls':
         data_format = 'xlsx'
+    elif data_format == 'jpeg':
+        data_format = 'jpg'
     try:
         eval(data_format + '_to_pdf(in_path, out_path)')
         return None
@@ -38,10 +41,10 @@ def file_to_pdf(in_path, out_path, verbose=False):
         if verbose:
             print("\t" + error_msg)
     except Exception as e:
-        if data_format == 'msg':
-            error_msg = "You don't have the permission to open the email."
-        else:
-            error_msg = str(e)
+        #if data_format == 'msg':
+        #    error_msg = "You don't have the permission to open the email."
+        #else:
+        error_msg = str(e)
         if verbose:
             print("\t" + error_msg)
         return error_msg
@@ -65,43 +68,56 @@ def docx_to_pdf(in_path, out_path):
 
 def jpg_to_pdf(in_path, out_path):
     image = Image.open(in_path)
+    
+    x_len, y_len = image.size
+    a4_x_len = 595
+    new_x_len = min(x_len, a4_x_len)
+    scale_factor = new_x_len/x_len
+    new_y_len = int(scale_factor * y_len)
+    image = image.resize((new_x_len,new_y_len), Image.ANTIALIAS)
+    
     im = image.convert('RGB')
     im.save(out_path)
-    im.close()
+    image.close()
 
 
 def msg_to_pdf(in_path, out_path):
-    out_path_prov = remove_data_format(out_path)
-    out_path_prov = out_path_prov + '.msg'
-    _, root_in_path = get_root(in_path)
-    out_path_prov_dir = os.path.join(root_in_path, 'email')
-    print('*** msg debugging. Out path prov: {}, dir: {}'.format(out_path_prov, out_path_prov_dir))
+    root_out_path = get_root(out_path)
+    out_path_prov_dir = os.path.join(root_out_path, 'email')  # extract in this folder the email content
 
-    shutil.copy(in_path, out_path_prov)
-    msg = extract_msg.Message(out_path_prov)  # This will create a local 'msg' object for each email in direcory
+    msg = extract_msg.Message(in_path)  # This will create a local 'msg' object for each email in direcory
+    
     # This will create a separate folder and save a text file with email body content, also it will download all
     # attachments inside this folder.
     msg.save(
-        customFilename=out_path_prov_dir)
+        customPath=out_path_prov_dir, maxNameLength=150, customFilename='a')
     msg.close()
-    os.remove(out_path_prov)
 
     # convert the email and the attachments to PDF
     for root, _, files in os.walk(out_path_prov_dir):
         for file in files:
             in_file_path = os.path.join(root, file)
             filename = get_directory_name(in_file_path)
-            _, filename = get_format(filename)
             out_file_path = os.path.join(out_path_prov_dir, filename + '.pdf')
-            file_to_pdf(in_file_path, out_file_path)
+            idx = 0
+            while os.path.isfile(out_file_path):
+                out_file_path = os.path.join(out_path_prov_dir, filename + str(idx) + '.pdf')
+                idx += 1
+            err = file_to_pdf(in_file_path, out_file_path)
             os.remove(in_file_path)
 
     # merge the email and all the attachments
     paths = []
     for root, _, files in os.walk(out_path_prov_dir):
-        if 'message.pdf' in files:
-            paths.append(os.path.join(root, 'message.pdf'))
-            files.remove('message.pdf')
+        # first put the text body of the email ...
+        txt_files = []
+        for file in files:
+            if '.txt' in file:
+                paths.append(os.path.join(root, file))
+                txt_files.append(file)
+        # ... and then all the other attachments
+        for txt_file in txt_files:
+            files.remove(txt_file)
         for file in files:
             file_path = os.path.join(root, file)
             paths.append(file_path)
@@ -115,7 +131,10 @@ def msg_to_pdf(in_path, out_path):
     merger.close()
 
     # remove the folder with the email and the attachments and the copy of the email
-    shutil.rmtree(out_path_prov_dir)
+    try:
+        shutil.rmtree(out_path_prov_dir)
+    except OSError:
+        os.remove(out_path_prov_dir)
 
 
 def pdf_to_pdf(in_path, out_path):
@@ -124,9 +143,17 @@ def pdf_to_pdf(in_path, out_path):
 
 def png_to_pdf(in_path, out_path):
     image = Image.open(in_path)
+   
+    x_len, y_len = image.size
+    a4_x_len = 595
+    new_x_len = min(x_len, a4_x_len)
+    scale_factor = new_x_len/x_len
+    new_y_len = int(scale_factor * y_len)
+    image = image.resize((new_x_len,new_y_len), Image.ANTIALIAS)
+    
     im = image.convert('RGB')
     im.save(out_path)
-    im.close()
+    image.close()
 
 
 def pptx_to_pdf(in_path, out_path):
@@ -147,12 +174,18 @@ def txt_to_pdf(in_path, out_path):
     pdf = FPDF()
 
     pdf.add_page()
-    pdf.set_font("Arial", size=15)
+    pdf.set_font("Arial", size=11)
+    wrapper = TextWrapper(width=95, break_long_words=True)
 
-    f = open(in_path, "r")
+    with open(in_path, "r", encoding='utf-8') as f:
 
-    for x in f:
-        pdf.cell(200, 10, txt=x, ln=1, align='C')
+        for line in f:
+            line_no_special_chars = line.encode('latin-1', 'replace').decode('latin-1')
+            short_lines = wrapper.wrap(text=line_no_special_chars)
+            for short_line in short_lines:
+                #print(line)
+                pdf.cell(200, 10, txt=short_line, ln=1, align='L')
+                
     pdf.output(out_path)
 
 

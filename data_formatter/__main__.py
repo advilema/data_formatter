@@ -14,7 +14,7 @@ def main() -> None:
         formatter.extract_csv()
         if args.extract_patients:
             formatter.extract_patient_folders()
-    if args.extract_patients:
+    elif args.extract_patients:
         formatter.extract_patient_folders()
     else:
         formatter.format()
