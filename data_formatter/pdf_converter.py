@@ -22,7 +22,7 @@ def file_to_pdf(in_path, out_path, verbose=False):
     """
     data_format = get_format(in_path)
     data_format = data_format.lower()  # This fix any upper/lower case problem (e.g. .JPG vs .jpg)
-    if data_format == 'doc':
+    if data_format == 'doc' or data_format == 'rtf':
         data_format = 'docx'
     elif data_format == 'xls':
         data_format = 'xlsx'
