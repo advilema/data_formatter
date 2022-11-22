@@ -180,7 +180,7 @@ def txt_to_pdf(in_path, out_path):
     with open(in_path, "r", encoding='utf-8') as f:
 
         for line in f:
-            line_no_special_chars = line.encode('latin-1', 'replace').decode('latin-1')
+            line_no_special_chars = line.encode('utf-8', 'replace').decode('utf-8')
             short_lines = wrapper.wrap(text=line_no_special_chars)
             for short_line in short_lines:
                 #print(line)
