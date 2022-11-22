@@ -505,12 +505,14 @@ class DataFormatter:
         update (create, if doesn't exist yet) the txt file with the time creation of the in_path_file
         """
         txt_path = os.path.join(out_path_dir, 'info.txt')
-        with open(txt_path, "a+") as file:
+        with open(txt_path, "a+", encoding='utf-8') as file:
             if self.time_order == 'creation':
                 path_time = str(os.path.getctime(in_path_file))
             else:
                 path_time = str(os.path.getmtime(in_path_file))
-            file.write(out_path_file + '\n' + path_time + '\n')
+            file_info = out_path_file + '\n' + path_time + '\n'
+            file_info = file_info.encode('utf-8', 'replace').decode('utf-8')
+            file.write(out_path_file + '\n' + path_time + '\n', )
         return txt_path
 
     def _show_info(self, file, skipping=False):
