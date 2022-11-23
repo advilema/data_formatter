@@ -37,11 +37,11 @@ def append_str(file_path: str, string: str) -> None:
     :return:
     """
     if not os.path.isfile(file_path):
-        with open(file_path, 'w') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             f.write(string)
             f.write('\n')
     else:
-        with open(file_path, 'a') as f:
+        with open(file_path, 'a', encoding='utf-8') as f:
             f.write(string)
             f.write('\n')
 
