@@ -36,6 +36,7 @@ def append_str(file_path: str, string: str) -> None:
     :param string:
     :return:
     """
+    string = string.encode('utf-8', 'replace').decode('utf-8')
     if not os.path.isfile(file_path):
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(string)
