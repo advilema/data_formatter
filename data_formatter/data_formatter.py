@@ -134,14 +134,13 @@ def merge_pdfs(txt_path):
     """
     txt_path_root = get_root(txt_path)
     patient = get_directory_name(txt_path_root)
-    with open(txt_path) as f:
+    with open(txt_path, encoding='utf-8') as f:
         lines = f.readlines()
     files = []
     for i in range(len(lines) // 2):
         path = re.sub('\n', '', lines[2 * i])
         time = float(re.sub('\n', '', lines[2 * i + 1]))
         files.append([path, time])
-    key = lambda x: x[1]
     files = sorted(files, key=lambda x: x[1])
     paths = [file[0] for file in files]
 
@@ -176,7 +175,7 @@ def make_metadata(txt_path):
     make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
 
     first_name, last_name, birthday, case_nr = extract_patient_data(patient)
-    with open(metadata_path, 'w') as f:
+    with open(metadata_path, 'w', encoding='utf-8') as f:
         f.write('dokuart = "DMDOK"\n')
         f.write('logi_verzeichnis = "Freigabe"\n')
         documentation = 'Wunddokumentation' if 'Wunddoku' in txt_path_root else 'Stomadokumentation'
@@ -375,7 +374,7 @@ class DataFormatter:
         patients_data = self._extract_patients_data()
 
         print('Creating the csv file ...')
-        with open(csv_path, 'w', encoding='UTF8', newline='') as f:
+        with open(csv_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for patient_data in patients_data:
@@ -392,7 +391,7 @@ class DataFormatter:
         log_dir = get_root(self.log_path)
         make_dir(Path(log_dir))
         # clear the log file if there exist already one
-        with open(self.log_path, 'w') as f:
+        with open(self.log_path, 'w', encoding='utf-8') as f:
             f.write('')
 
         patient_folder = None
@@ -402,7 +401,7 @@ class DataFormatter:
             patient_folder = get_patient_folder(root, patient_folder)
             if patient_folder is not None and previous_patient_folder != patient_folder:
                 patient = get_directory_name(patient_folder)
-                with open(self.log_path, 'a') as f:
+                with open(self.log_path, 'a', encoding='utf-8') as f:
                     f.write(patient + '\n')
                 previous_patient_folder = patient_folder
 
@@ -469,7 +468,7 @@ class DataFormatter:
     def _save_log(self, not_converted_files, ignored_files, verbose=True):
 
         # save in the log ignored and not converted files
-        with open(self.log_path, 'a') as f:
+        with open(self.log_path, 'a', encoding='utf-8') as f:
             tot_files = self.tot_files
             if ignored_files:
                 f.write(
@@ -494,7 +493,7 @@ class DataFormatter:
 
         # print the log
         if verbose:
-            with open(self.log_path, 'r') as f:
+            with open(self.log_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
                 print('\n\n\n')
                 for line in lines:

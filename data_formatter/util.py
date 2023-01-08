@@ -18,7 +18,7 @@ def search_str(file_path: str, string: str) -> bool:
     """
     if not os.path.isfile(file_path):
         return False
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         # read all content of a file
         content = file.read()
         # check if string present in a file
@@ -37,11 +37,11 @@ def append_str(file_path: str, string: str) -> None:
     :return:
     """
     if not os.path.isfile(file_path):
-        with open(file_path, 'w') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             f.write(string)
             f.write('\n')
     else:
-        with open(file_path, 'a') as f:
+        with open(file_path, 'a', encoding='utf-8') as f:
             f.write(string)
             f.write('\n')
 
@@ -62,7 +62,7 @@ def check_cache_file(file_path: str) -> bool:
 def make_file(file_path):
     dir_path = get_root(file_path)
     make_dir(Path(dir_path))
-    with open(file_path, 'w') as f:
+    with open(file_path, 'w', encoding='utf-8') as f:
         f.write('')
 
 
