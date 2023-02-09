@@ -8,7 +8,8 @@ def main() -> None:
     args = parse()
     input_folder = args.input
     output_folder = args.output
-    formatter = DataFormatter(input_folder, output_folder, print_folders=args.print_folders,log_path=args.log)
+    formatter = DataFormatter(input_folder, output_folder, print_folders=args.print_folders,
+                              log_path=args.log, err_path=args.err, record_path=args.record)
 
     if args.extract_csv:
         formatter.extract_csv()

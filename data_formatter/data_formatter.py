@@ -162,47 +162,6 @@ def merge_pdfs(txt_path):
         os.remove(pdf)
 
 
-def make_metadata(txt_path):
-    """
-    Create the metadata .jpl file
-    """
-    txt_path_root = get_root(txt_path)
-    patient = get_directory_name(txt_path_root)
-    [first_name, last_name, birthday, case_nr] = extract_patient_data(patient)
-    filename = first_name + ', ' + last_name + ' Fall-Nr ' + case_nr + '.jpl'
-    metadata_path = os.path.join(txt_path_root, filename)
-    metadata_dir = get_root(metadata_path)
-    make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
-
-    first_name, last_name, birthday, case_nr = extract_patient_data(patient)
-    with open(metadata_path, 'w', encoding='utf-8') as f:
-        f.write('dokuart = "DMDOK"\n')
-        f.write('logi_verzeichnis = "Freigabe"\n')
-        documentation = 'Wunddokumentation' if 'Wunddoku' in txt_path_root else 'Stomadokumentation'
-        f.write('dok_dat_feld[3] = "MCC AA ' + documentation + ' Migration"\n')
-        f.write('dok_dat_feld[5] = "' + documentation + '"\n')
-        f.write('dok_dat_feld[7] = "' + case_nr + '"\n')
-        if first_name is not None:
-            f.write('dok_dat_feld[11] = "' + first_name + '"\n')
-        else:
-            print('WARNING: was not possible to extract the first name in patient: {}'.format(patient))
-        if last_name is not None:
-            f.write('dok_dat_feld[12] = "' + last_name + '"\n')
-        else:
-            print('WARNING: was not possible to extract the last name in patient: {}'.format(patient))
-        f.write('dok_dat_feld[14] = "Migrationsdokument"\n')
-        f.write('dok_dat_feld[15] = "2080"\n')
-        f.write('dok_dat_feld[16] = "MCC HLT"\n')
-        today = date.today()
-        today_str = today.strftime("%d.%m.%Y")
-        f.write('dok_dat_feld[50] = "' + today_str + '"\n')
-        f.write('dok_dat_feld[52] = "' + today_str + '"\n')
-        if birthday is not None:
-            f.write('dok_dat_feld[53] = "' + birthday + '"\n')
-        else:
-            print('WARNING: was not possible to extract the birthday in patient: {}'.format(patient))
-
-
 class DataFormatter:
     def __init__(self, input_folder, output_folder, time_order='creation', print_folders=False,
                  log_path=None, err_path=None, record_path=None):
@@ -342,7 +301,7 @@ class DataFormatter:
             if txt_path_previous != txt_path:
                 try:
                     merge_pdfs(txt_path_previous)
-                    make_metadata(txt_path_previous)
+                    self._make_metadata(txt_path_previous)
                 except Exception as e:
                     # handle errors in the merging process
                     append_str(self.err_path, str(e))
@@ -351,7 +310,7 @@ class DataFormatter:
         # remember to merge all the files of the last patient as well
         try:
             merge_pdfs(txt_path)
-            make_metadata(txt_path)
+            self._make_metadata(txt_path)
         except Exception as e:
             # handle errors in the merging process
             append_str(self.err_path, str(e))
@@ -442,6 +401,49 @@ class DataFormatter:
                 previous_patient_folder = patient_folder
 
         return patients_data
+
+    def _make_metadata(self, txt_path):
+        """
+        Create the metadata .jpl file
+        """
+        txt_path_root = get_root(txt_path)
+        patient = get_directory_name(txt_path_root)
+        [first_name, last_name, birthday, case_nr] = extract_patient_data(patient)
+        filename = first_name + ', ' + last_name + ' Fall-Nr ' + case_nr + '.jpl'
+        metadata_path = os.path.join(txt_path_root, filename)
+        metadata_dir = get_root(metadata_path)
+        make_dir(Path(metadata_dir))  # create the metadata dir if it has not been created yet
+
+        first_name, last_name, birthday, case_nr = extract_patient_data(patient)
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            f.write('dokuart = "DMDOK"\n')
+            f.write('logi_verzeichnis = "Freigabe"\n')
+            print('***********herererere******************')
+            print(self.abs_in_path.lower())
+            documentation = 'Wunddokumentation' if 'wunddoku' in self.abs_in_path.lower() else 'Stomadokumentation'
+            print(documentation)
+            f.write('dok_dat_feld[3] = "MCC AA ' + documentation + ' Migration"\n')
+            f.write('dok_dat_feld[5] = "' + documentation + '"\n')
+            f.write('dok_dat_feld[7] = "' + case_nr + '"\n')
+            if first_name is not None:
+                f.write('dok_dat_feld[11] = "' + first_name + '"\n')
+            else:
+                print('WARNING: was not possible to extract the first name in patient: {}'.format(patient))
+            if last_name is not None:
+                f.write('dok_dat_feld[12] = "' + last_name + '"\n')
+            else:
+                print('WARNING: was not possible to extract the last name in patient: {}'.format(patient))
+            f.write('dok_dat_feld[14] = "Migrationsdokument"\n')
+            f.write('dok_dat_feld[15] = "2080"\n')
+            f.write('dok_dat_feld[16] = "MCC HLT"\n')
+            today = date.today()
+            today_str = today.strftime("%d.%m.%Y")
+            f.write('dok_dat_feld[50] = "' + today_str + '"\n')
+            f.write('dok_dat_feld[52] = "' + today_str + '"\n')
+            if birthday is not None:
+                f.write('dok_dat_feld[53] = "' + birthday + '"\n')
+            else:
+                print('WARNING: was not possible to extract the birthday in patient: {}'.format(patient))
 
     # given the input_folder (e.g. 'test_data'), the output_folder (e.g. 'results'), the absolute path of the patient folder
     # and the filename, create the output_path_dir if it doesn't exis yet, and output the dir_path and file_path
