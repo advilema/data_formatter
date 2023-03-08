@@ -424,7 +424,12 @@ class DataFormatter:
             print(documentation)
             f.write('dok_dat_feld[3] = "MCC AA ' + documentation + ' Migration"\n')
             f.write('dok_dat_feld[5] = "' + documentation + '"\n')
-            f.write('dok_dat_feld[7] = "' + case_nr + '"\n')
+            first_non_zero_number = 0
+            for i, ch in enumerate(case_nr):
+                if ch != '0':
+                    first_non_zero_number = i
+                    break
+            f.write('dok_dat_feld[7] = "' + case_nr[first_non_zero_number:] + '"\n')
             if first_name is not None:
                 f.write('dok_dat_feld[11] = "' + first_name + '"\n')
             else:
@@ -433,7 +438,7 @@ class DataFormatter:
                 f.write('dok_dat_feld[12] = "' + last_name + '"\n')
             else:
                 print('WARNING: was not possible to extract the last name in patient: {}'.format(patient))
-            f.write('dok_dat_feld[14] = "Migrationsdokument"\n')
+            f.write('dok_dat_feld[14] = "Bericht Pflege"\n')
             f.write('dok_dat_feld[15] = "2080"\n')
             f.write('dok_dat_feld[16] = "MCC HLT"\n')
             today = date.today()
